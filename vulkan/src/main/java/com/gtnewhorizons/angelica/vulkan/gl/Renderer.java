@@ -562,11 +562,11 @@ final class Renderer {
                 srcAccess |= VK_ACCESS_TRANSFER_WRITE_BIT;
             }
             if (pendingComputeBarrier) {
-                src |= VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+                src |= shaderStages();
                 srcAccess |= VK_ACCESS_SHADER_WRITE_BIT;
             }
             gl.images.globalBarrier(cmd, src, srcAccess,
-                VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT | VK_PIPELINE_STAGE_VERTEX_INPUT_BIT | VK_PIPELINE_STAGE_VERTEX_SHADER_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_TRANSFER_BIT,
+                VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT | VK_PIPELINE_STAGE_VERTEX_INPUT_BIT | shaderStages() | VK_PIPELINE_STAGE_TRANSFER_BIT,
                 VK_ACCESS_INDIRECT_COMMAND_READ_BIT | VK_ACCESS_INDEX_READ_BIT | VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT | VK_ACCESS_UNIFORM_READ_BIT | VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT | VK_ACCESS_TRANSFER_READ_BIT | VK_ACCESS_TRANSFER_WRITE_BIT);
             pendingTransferBarrier = false;
             pendingComputeBarrier = false;
@@ -748,6 +748,14 @@ final class Renderer {
         final int imageLayoutFor = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
         for (int bi = 0; bi < prog.bindings.size(); bi++) {
             final Program.Binding b = prog.bindings.get(bi);
+            if (b.kind != Program.BindingKind.STORAGE_IMAGE) continue;
+            final Program.Uniform u = prog.uniforms.get(b.ref);
+            for (int e = 0; e < b.count; e++) {
+                gl.textures.storageImageView(st, Math.min(Math.max(0, u.units[e]), GlState.MAX_IMAGE_UNITS - 1), target);
+            }
+        }
+        for (int bi = 0; bi < prog.bindings.size(); bi++) {
+            final Program.Binding b = prog.bindings.get(bi);
             switch (b.kind) {
                 case DEFAULT_BLOCK -> {
                     final Program.StageBlock blk = prog.blocks[b.ref];
@@ -831,8 +839,8 @@ final class Renderer {
                         final int unit = Math.min(Math.max(0, u.units[e]), GlState.MAX_IMAGE_UNITS - 1);
                         final long view = gl.textures.storageImageView(st, unit, target);
                         key[k++] = view;
+                        key[k++] = 0L;
                         key[k++] = VK_IMAGE_LAYOUT_GENERAL;
-                        key[k++] = 0;
                     }
                 }
             }
@@ -1183,6 +1191,13 @@ final class Renderer {
     }
 
 
+    private int shaderStages() {
+        int stages = VK_PIPELINE_STAGE_VERTEX_SHADER_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
+        if (gl.gpu.geometryShader) stages |= VK_PIPELINE_STAGE_GEOMETRY_SHADER_BIT;
+        if (gl.gpu.tessellationShader) stages |= VK_PIPELINE_STAGE_TESSELLATION_CONTROL_SHADER_BIT | VK_PIPELINE_STAGE_TESSELLATION_EVALUATION_SHADER_BIT;
+        return stages;
+    }
+
     boolean prepareDispatch(GlState st) {
         final Program prog = gl.programs.current(st);
         if (prog == null || !prog.linked || !prog.compute) return false;
@@ -1191,7 +1206,7 @@ final class Renderer {
         endPass();
         final VkCommandBuffer cmd = gl.stream.cmd();
         if (pendingTransferBarrier || pendingComputeBarrier) {
-            gl.images.globalBarrier(cmd, VK_PIPELINE_STAGE_TRANSFER_BIT | VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+            gl.images.globalBarrier(cmd, VK_PIPELINE_STAGE_TRANSFER_BIT | shaderStages(),
                 VK_ACCESS_TRANSFER_WRITE_BIT | VK_ACCESS_SHADER_WRITE_BIT,
                 VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT, VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT | VK_ACCESS_INDIRECT_COMMAND_READ_BIT | VK_ACCESS_UNIFORM_READ_BIT);
             pendingTransferBarrier = false;
