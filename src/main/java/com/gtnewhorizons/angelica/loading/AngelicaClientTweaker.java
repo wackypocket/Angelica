@@ -18,6 +18,7 @@ import com.gtnewhorizons.angelica.glsm.profiling.TracyOptions;
 import com.gtnewhorizons.angelica.loading.fml.compat.CompatHandlers;
 import com.gtnewhorizons.angelica.lwjgl3.MissingDependencySdl;
 import com.gtnewhorizons.angelica.sdlgpu.SDLGPUGate;
+import com.gtnewhorizons.angelica.vulkan.VulkanGate;
 import com.gtnewhorizons.angelica.mixins.Mixins;
 import cpw.mods.fml.relauncher.FMLLaunchHandler;
 import cpw.mods.fml.relauncher.FMLRelaunchLog;
@@ -72,11 +73,14 @@ public final class AngelicaClientTweaker implements IFMLLoadingPlugin, IEarlyMix
             // Angelica Config
             ConfigurationManager.registerConfig(AngelicaConfig.class);
             TracyOptions.latch(AngelicaConfig.enableTracy, AngelicaConfig.tracyAllowRemote, AngelicaConfig.tracyFineZones, AngelicaConfig.tracyMaxSrcLocs);
-            if (BackendStartGuard.begin(new File(Launch.minecraftHome, "angelica"), AngelicaConfig.sdlGpuConfigured(), SystemProperties.SDL_GPU_OVERRIDE != null, SDLGPUGate.REQUIREMENTS_REVISION, BackendOptions.sdlGpuDriver(AngelicaConfig.sdlGpuDriverName()))) {
+            final boolean vulkan = AngelicaConfig.vulkanConfigured();
+            final String guardKey = vulkan ? "vulkan" : BackendOptions.sdlGpuDriver(AngelicaConfig.sdlGpuDriverName());
+            if (BackendStartGuard.begin(new File(Launch.minecraftHome, "angelica"), AngelicaConfig.sdlGpuConfigured() || vulkan,
+                SystemProperties.SDL_GPU_OVERRIDE != null || SystemProperties.VULKAN_OVERRIDE != null, SDLGPUGate.REQUIREMENTS_REVISION, guardKey)) {
                 AngelicaConfig.renderBackend = RenderBackendChoice.OPENGL;
                 ConfigurationManager.save(AngelicaConfig.class);
             }
-            BackendOptions.latch(AngelicaConfig.sdlGpuConfigured(), AngelicaConfig.sdlGpuDriverName(), AngelicaConfig.glVersion);
+            BackendOptions.latch(AngelicaConfig.sdlGpuConfigured(), AngelicaConfig.vulkanConfigured(), AngelicaConfig.sdlGpuDriverName(), AngelicaConfig.glVersion);
             ConfigurationManager.registerConfig(CompatConfig.class);
             ConfigurationManager.registerConfig(FontConfig.class);
             MCPatcherForgeConfig.registerConfig();
@@ -98,6 +102,13 @@ public final class AngelicaClientTweaker implements IFMLLoadingPlugin, IEarlyMix
             DependencyVerifier.gtnhLibChecks("Angelica"), LOGGER,
             (title, message) -> MissingDependencySdl.showFatal(title, message));
 
+        if (VulkanGate.isRequested()) {
+            if (VulkanGate.isVulkanAvailable()) {
+                LOGGER.info("Vulkan backend requested");
+            } else {
+                LOGGER.warn("Vulkan backend unavailable, running on OpenGL: {}", VulkanGate.missingRequirement());
+            }
+        }
         if (BackendOptions.sdlGpuRequested()) {
             if (SDLGPUGate.isSDLGPUAvailable()) {
                 LOGGER.info("SDL GPU window mode enabled");

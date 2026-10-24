@@ -56,6 +56,7 @@ public abstract class RenderBackend {
     public boolean isIndirectRequired() { return false; }
     public boolean supportsGeometryShaders() { return true; }
     public boolean isSDLGPU() { return false; }
+    public boolean isVulkan() { return false; }
 
     public boolean framebufferCompletenessIsMeaningful() { return true; }
     public void onPersistentBufferWrite(int glId, long offset, long size) {}

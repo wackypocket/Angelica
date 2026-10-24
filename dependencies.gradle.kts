@@ -92,6 +92,7 @@ DependencyHandlerScope.of(dependencies).apply {
     shadowImplementation(project(":glsm")) { isTransitive = false }
     shadowImplementation(project(":lwjgl3-backend")) { isTransitive = false }
     shadowImplementation(project(":sdl-gpu")) { isTransitive = false }
+    shadowImplementation(project(":vulkan")) { isTransitive = false }
     runtimeOnlyNonPublishable(project(":tracy-client")) { isTransitive = false }
     if (System.getProperty("os.name").lowercase().contains("mac")) {
         runtimeOnlyNonPublishable(project(":moltenvk")) { isTransitive = false }

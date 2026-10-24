@@ -14,6 +14,7 @@ tasks.named<ShadowJar>("shadowJar") {
         exclude(project(":glsm"))
         exclude(project(":lwjgl3-backend"))
         exclude(project(":sdl-gpu"))
+        exclude(project(":vulkan"))
         exclude(dependency("org.taumc:.*:.*"))
         exclude(dependency("org.embeddedt.celeritas:.*:.*"))
         exclude(dependency("org.antlr:.*:.*"))
@@ -25,4 +26,5 @@ tasks.named<ShadowJar>("shadowJar") {
     relocate("com.gtnewhorizons.angelica.glsm", "com.gtnewhorizons.angelica.glsm")
     relocate("com.gtnewhorizons.angelica.lwjgl3", "com.gtnewhorizons.angelica.lwjgl3")
     relocate("com.gtnewhorizons.angelica.sdlgpu", "com.gtnewhorizons.angelica.sdlgpu")
+    relocate("com.gtnewhorizons.angelica.vulkan", "com.gtnewhorizons.angelica.vulkan")
 }

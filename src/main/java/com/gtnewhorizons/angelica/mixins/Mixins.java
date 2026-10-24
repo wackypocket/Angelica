@@ -10,6 +10,7 @@ import com.gtnewhorizons.angelica.glsm.CaptureGate;
 import com.gtnewhorizons.angelica.glsm.backend.BackendOptions;
 import com.gtnewhorizons.angelica.glsm.profiling.TracyOptions;
 import com.gtnewhorizons.angelica.sdlgpu.SDLGPUGate;
+import com.gtnewhorizons.angelica.vulkan.VulkanGate;
 import jss.notfine.config.MCPatcherForgeConfig;
 import jss.notfine.config.NotFineConfig;
 import lombok.Getter;
@@ -115,6 +116,15 @@ public enum Mixins implements IMixins {
         .addClientMixins(
             "sdlgpu.MixinForgeHooksClient_SDLGPUDisplay",
             "sdlgpu.MixinMinecraft_SDLGPUIcons"
+        )
+    ),
+
+    ANGELICA_VULKAN_DISPLAY(new MixinBuilder("Vulkan backend Display.create path")
+        .setPhase(Phase.EARLY)
+        .setApplyIf(() -> VulkanGate.isRequested() && VulkanGate.isVulkanAvailable())
+        .addClientMixins(
+            "vulkan.MixinForgeHooksClient_VulkanDisplay",
+            "vulkan.MixinMinecraft_VulkanIcons"
         )
     ),
 

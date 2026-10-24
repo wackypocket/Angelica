@@ -4,7 +4,8 @@ import me.jellysquid.mods.sodium.client.gui.options.named.NamedState;
 
 public enum RenderBackendChoice implements NamedState {
     OPENGL ("options.angelica.renderer.backend.opengl"),
-    SDL_GPU("options.angelica.renderer.backend.sdl_gpu");
+    SDL_GPU("options.angelica.renderer.backend.sdl_gpu"),
+    VULKAN ("options.angelica.renderer.backend.vulkan");
 
     private final String key;
 

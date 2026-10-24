@@ -40,6 +40,15 @@ public final class SystemProperties {
     public static final boolean DISABLE_SDL_PRESENTER_THREAD = Boolean.getBoolean("angelica.sdlgpu.disablePresenterThread");
     public static final boolean SDL_DISABLE_IN_PASS_CLEAR = Boolean.getBoolean("angelica.sdlgpu.disableInPassClear");
 
+    // Vulkan Native
+    public static final String KEY_USE_VULKAN = "angelica.vulkan";
+    public static final Boolean VULKAN_OVERRIDE = parseBooleanOverride(KEY_USE_VULKAN);
+    public static final boolean VULKAN_STATS = Boolean.getBoolean("angelica.vulkan.stats");
+    public static final boolean VULKAN_DEBUG = Boolean.getBoolean("angelica.vulkan.debug");
+    public static final boolean VULKAN_NO_PRESENT_WAIT = Boolean.getBoolean("angelica.vulkan.noPresentWait");
+    public static final int VULKAN_FRAMES_IN_FLIGHT = Integer.getInteger("angelica.vulkan.framesInFlight", 2);
+    public static final String VULKAN_DEVICE = System.getProperty("angelica.vulkan.device", "");
+
     // Tracy
     public static final Boolean TRACY_OVERRIDE = parseBooleanOverride("angelica.tracy");
     public static final Boolean TRACY_FINE_ZONES_OVERRIDE = parseBooleanOverride("angelica.tracy.fineZones");

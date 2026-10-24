@@ -15,6 +15,7 @@ import com.gtnewhorizons.angelica.glsm.hooks.GLSMInitConfig;
 import com.gtnewhorizons.angelica.proxy.ClientProxy;
 import com.gtnewhorizons.angelica.render.SelectionBoxRenderer;
 import com.gtnewhorizons.angelica.sdlgpu.SDLGPUGate;
+import com.gtnewhorizons.angelica.vulkan.VulkanGate;
 import org.embeddedt.embeddium.impl.gl.debug.GLDebug;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.OpenGlHelper;
@@ -31,6 +32,7 @@ public class MixinInitGLStateManager {
     private static void angelica$installSDLDrawable(CallbackInfo ci) {
         GLSMConfig.workerThreadCount = AngelicaConfig.workerThreadCount;
         SDLGPUGate.ensureDrawableInstalled();
+        VulkanGate.ensureDrawableInstalled();
     }
 
     @Inject(method = "initializeTextures", at = @At("RETURN"))

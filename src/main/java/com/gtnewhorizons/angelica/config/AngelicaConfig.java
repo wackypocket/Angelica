@@ -470,7 +470,7 @@ public class AngelicaConfig {
     @Config.RequiresMcRestart
     public static int glVersion;
 
-    @Config.Comment("Render backend: OPENGL, or SDL_GPU (experimental; Vulkan/Metal/Direct3D 12 through SDL3, falls back to OpenGL when no device can be created). -Dangelica.sdlgpu.enable=true|false overrides this.")
+    @Config.Comment("Render backend: OPENGL, SDL_GPU (experimental; Vulkan/Metal/Direct3D 12 through SDL3) or VULKAN (experimental; native Vulkan, MoltenVK on macOS). Both fall back to OpenGL when no device can be created. -Dangelica.sdlgpu.enable / -Dangelica.vulkan=true|false override this.")
     @Config.DefaultEnum("OPENGL")
     @Config.RequiresMcRestart
     public static RenderBackendChoice renderBackend;
@@ -550,6 +550,10 @@ public class AngelicaConfig {
 
     public static boolean sdlGpuConfigured() {
         return renderBackend == RenderBackendChoice.SDL_GPU;
+    }
+
+    public static boolean vulkanConfigured() {
+        return renderBackend == RenderBackendChoice.VULKAN;
     }
 
     public static String sdlGpuDriverName() {

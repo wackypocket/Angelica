@@ -389,7 +389,7 @@ public final class ClientProxy extends CommonProxy {
 
     @SubscribeEvent(priority = EventPriority.LOWEST)
     public void onGuiOpen(GuiOpenEvent event) {
-        if (BackendManager.RENDER_BACKEND.isSDLGPU()) BackendStartGuard.latch();
+        if (BackendManager.RENDER_BACKEND.isSDLGPU() || BackendManager.RENDER_BACKEND.isVulkan()) BackendStartGuard.latch();
         if (!event.isCanceled()) {
             if (event.gui instanceof GuiMainMenu && gameStartTime == -1) {
                 gameStartTime = ManagementFactory.getRuntimeMXBean().getUptime() / 1000f;

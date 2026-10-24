@@ -190,7 +190,7 @@ tasks.test {
     configureAngelicaJava8()
     classpath = archScanAsm + classpath
     jvmArgs("-Dceleritas.lwjglService=org.taumc.celeritas.lwjgl.HeadlessTestLWJGLService")
-    dependsOn(":glsm:classes", ":lwjgl3-backend:classes", ":sdl-gpu:classes")
+    dependsOn(":glsm:classes", ":lwjgl3-backend:classes", ":sdl-gpu:classes", ":vulkan:classes")
 }
 
 val downgradeRootMainClasses = tasks.named<DowngradeFiles>("downgradeMainClasses")
