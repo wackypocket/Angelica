@@ -18,7 +18,7 @@ public final class Spirv {
     static final int OP_TYPE_VOID = 19, OP_TYPE_BOOL = 20, OP_TYPE_INT = 21, OP_TYPE_FLOAT = 22, OP_TYPE_VECTOR = 23, OP_TYPE_MATRIX = 24;
     static final int OP_TYPE_IMAGE = 25, OP_TYPE_SAMPLER = 26, OP_TYPE_SAMPLED_IMAGE = 27, OP_TYPE_ARRAY = 28, OP_TYPE_RUNTIME_ARRAY = 29;
     static final int OP_TYPE_STRUCT = 30, OP_TYPE_POINTER = 32;
-    static final int OP_CONSTANT = 43, OP_SPEC_CONSTANT = 50;
+    static final int OP_CONSTANT = 43, OP_CONSTANT_NULL = 46, OP_SPEC_CONSTANT = 50, OP_FUNCTION = 54;
     static final int OP_VARIABLE = 59;
     static final int OP_DECORATE = 71, OP_MEMBER_DECORATE = 72;
 
@@ -254,6 +254,97 @@ public final class Spirv {
             case OP_TYPE_VECTOR -> e.operands[1];
             case OP_TYPE_MATRIX -> e.operands[1] * componentCount(types.get(e.operands[0]));
             default -> 1;
+        };
+    }
+
+    public static byte[] zeroInitLocals(byte[] spirv) {
+        final IntBuffer ib = ByteBuffer.wrap(spirv).order(ByteOrder.LITTLE_ENDIAN).asIntBuffer();
+        final int[] w = new int[ib.remaining()];
+        ib.get(w);
+        if (w.length < 5 || w[0] != MAGIC) return spirv;
+
+        final Int2ObjectOpenHashMap<int[]> types = new Int2ObjectOpenHashMap<>();
+        final Int2IntOpenHashMap nulls = new Int2IntOpenHashMap();
+        nulls.defaultReturnValue(0);
+        final IntArrayList pending = new IntArrayList();
+        for (int i = 5; i < w.length; ) {
+            final int wc = w[i] >>> 16, op = w[i] & 0xFFFF;
+            if (wc == 0) return spirv;
+            if (op >= OP_TYPE_VOID && op <= OP_TYPE_POINTER) {
+                final int[] t = new int[wc - 1];
+                t[0] = op;
+                System.arraycopy(w, i + 2, t, 1, wc - 2);
+                types.put(w[i + 1], t);
+            } else if (op == OP_CONSTANT_NULL) {
+                nulls.putIfAbsent(w[i + 1], w[i + 2]);
+            } else if (op == OP_VARIABLE && wc == 4 && w[i + 3] == 7 /* Function */) {
+                pending.add(i);
+            }
+            i += wc;
+        }
+        if (pending.isEmpty()) return spirv;
+
+        int bound = w[3];
+        final IntArrayList newNulls = new IntArrayList();
+        final Int2IntOpenHashMap initFor = new Int2IntOpenHashMap();
+        for (int k = 0; k < pending.size(); k++) {
+            final int at = pending.getInt(k);
+            final int[] ptr = types.get(w[at + 1]);
+            if (ptr == null || ptr[0] != OP_TYPE_POINTER) continue;
+            final int pointee = ptr[2];
+            if (!nullable(types, pointee)) continue;
+            int id = nulls.get(pointee);
+            if (id == 0) {
+                id = bound++;
+                nulls.put(pointee, id);
+                newNulls.add(pointee);
+                newNulls.add(id);
+            }
+            initFor.put(at, id);
+        }
+        if (initFor.isEmpty()) return spirv;
+
+        final IntArrayList out = new IntArrayList(w.length + initFor.size() + newNulls.size() * 3 / 2);
+        for (int i = 0; i < 5; i++) out.add(w[i]);
+        out.set(3, bound);
+        boolean emitted = false;
+        for (int i = 5; i < w.length; ) {
+            final int wc = w[i] >>> 16, op = w[i] & 0xFFFF;
+            if (op == OP_FUNCTION && !emitted) {
+                for (int n = 0; n < newNulls.size(); n += 2) {
+                    out.add(3 << 16 | OP_CONSTANT_NULL);
+                    out.add(newNulls.getInt(n));
+                    out.add(newNulls.getInt(n + 1));
+                }
+                emitted = true;
+            }
+            if (initFor.containsKey(i)) {
+                out.add(5 << 16 | OP_VARIABLE);
+                out.add(w[i + 1]);
+                out.add(w[i + 2]);
+                out.add(w[i + 3]);
+                out.add(initFor.get(i));
+            } else {
+                for (int j = 0; j < wc; j++) out.add(w[i + j]);
+            }
+            i += wc;
+        }
+        final ByteBuffer bb = ByteBuffer.allocate(out.size() * 4).order(ByteOrder.LITTLE_ENDIAN);
+        bb.asIntBuffer().put(out.toIntArray());
+        return bb.array();
+    }
+
+    private static boolean nullable(Int2ObjectOpenHashMap<int[]> types, int id) {
+        final int[] t = types.get(id);
+        if (t == null) return false;
+        return switch (t[0]) {
+            case OP_TYPE_BOOL, OP_TYPE_INT, OP_TYPE_FLOAT -> true;
+            case OP_TYPE_VECTOR, OP_TYPE_MATRIX, OP_TYPE_ARRAY -> nullable(types, t[1]);
+            case OP_TYPE_STRUCT -> {
+                for (int m = 1; m < t.length; m++) if (!nullable(types, t[m])) yield false;
+                yield true;
+            }
+            default -> false;
         };
     }
 

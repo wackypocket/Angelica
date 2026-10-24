@@ -68,6 +68,7 @@ public final class ShaderCompiler {
             if (spirv == null) {
                 return new Result(null, err[0] == null ? "shaderc failed" : err[0]);
             }
+            spirv = Spirv.zeroInitLocals(spirv);
             if (diskKey != null) ShaderDiskCache.put(diskKey, spirv);
         }
         final Compiled out = new Compiled(spirv, pre != null ? pre.boolUniforms() : Collections.emptySet(), pre != null ? pre.explicitVsInputs() : Collections.emptySet(), explicitBindings(text));
@@ -79,7 +80,7 @@ public final class ShaderCompiler {
     }
 
     private static final class Toolchain {
-        static final String ID = ShaderCacheIO.libraryId(Shaderc.getLibrary()) + "/vk1";
+        static final String ID = ShaderCacheIO.libraryId(Shaderc.getLibrary()) + "/vk2";
     }
 
     private static String toolchainId() {
