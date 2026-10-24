@@ -983,7 +983,7 @@ final class Renderer {
 
     private int prepareSampled(Tex tex, Target target) {
         if (tex.pendingClear || tex.needsClear) materialize(tex);
-        final boolean feedback = target != null && passActive && passTarget.contains(tex) || target != null && target.contains(tex);
+        final boolean feedback = target != null && target.contains(tex);
         if (feedback) {
             if (tex.layout != VK_IMAGE_LAYOUT_GENERAL) {
                 endPass();
@@ -1330,6 +1330,13 @@ final class Renderer {
 
     void destroy() {
         endPass();
+        for (Tex t : new Tex[] {dummy2D, dummy2DArray, dummy3D, dummyCube, dummyDepth}) {
+            if (t != null) gl.images.release(t);
+        }
+        if (dummyBuffer != null && dummyBuffer.alloc != null) {
+            dummyBuffer.alloc.destroy(gl.gpu, gl.allocator);
+            dummyBuffer.alloc = null;
+        }
         for (long s : samplers.values()) vkDestroySampler(gl.gpu.device, s, null);
         samplers.clear();
         pipelines.destroy();

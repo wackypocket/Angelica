@@ -58,6 +58,7 @@ public final class ShaderCompiler {
         final GlslVulkanPreprocess.Result pre = GlslVulkanPreprocess.run(clean, glType, debugName, false);
         String text = pre != null ? pre.rewrittenSource() : clean;
         text = applyDepthFixup(text, depthFixup);
+        text = applyPerVertexRedeclaration(text, glType);
 
         final ShaderDiskCache.Key diskKey = ShaderDiskCache.isEnabled() ? ShaderDiskCache.key("vkspirv").str(toolchainId()).str(text).i(glType) : null;
         byte[] spirv = diskKey != null ? ShaderDiskCache.get(diskKey) : null;
@@ -80,7 +81,7 @@ public final class ShaderCompiler {
     }
 
     private static final class Toolchain {
-        static final String ID = ShaderCacheIO.libraryId(Shaderc.getLibrary()) + "/vk2";
+        static final String ID = ShaderCacheIO.libraryId(Shaderc.getLibrary()) + "/vk3";
     }
 
     private static String toolchainId() {
@@ -118,6 +119,14 @@ public final class ShaderCompiler {
                 + "\nvoid main() {\n    angelica_vk_main();\n    gl_Position.z = (gl_Position.z + gl_Position.w) * 0.5;\n}\n";
         }
         return head + "void angelica_vk_emit() {\n    gl_Position.z = (gl_Position.z + gl_Position.w) * 0.5;\n    EmitVertex();\n}\n#define EmitVertex() angelica_vk_emit()\n" + body;
+    }
+
+    static String applyPerVertexRedeclaration(String src, int glType) {
+        if (glType != GL20.GL_VERTEX_SHADER || !src.contains("gl_ClipDistance") || src.contains("gl_CullDistance") || src.contains("gl_PerVertex")) return src;
+        final int at = headerEnd(src);
+        return src.substring(0, at)
+            + "out gl_PerVertex { vec4 gl_Position; float gl_PointSize; float gl_ClipDistance[gl_MaxClipDistances]; };\n"
+            + src.substring(at);
     }
 
     static int headerEnd(String src) {

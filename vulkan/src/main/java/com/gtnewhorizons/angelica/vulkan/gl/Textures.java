@@ -428,11 +428,18 @@ final class Textures {
     void copyFromFramebuffer(GlState st, Tex dst, int target, int level, int dx, int dy, int dz, int sx, int sy, int w, int h) {
         if (dst == null || !dst.hasImage() || w <= 0 || h <= 0) return;
         final Target src = gl.renderer.readTarget(st);
-        final Tex s = src.color[0];
+        final boolean depth = dst.format.isDepthOrStencil();
+        final Tex s = depth ? src.depth : src.color[0];
         if (s == null) return;
+        if (depth && s.format.vk() != dst.format.vk()) {
+            gl.warnOnce("glCopyTexImage between depth formats " + s.format.vk() + " and " + dst.format.vk() + " is not supported");
+            return;
+        }
+        final int srcLevel = depth ? src.depthLevel : src.colorLevel[0];
+        final int srcLayer = depth ? src.depthLayer : src.colorLayer[0];
         // clip the source rectangle to the read buffer
         int x0 = sx, y0 = sy, x1 = sx + w, y1 = sy + h;
-        final int sw = s.levelWidth(src.colorLevel[0]), sh = s.levelHeight(src.colorLevel[0]);
+        final int sw = s.levelWidth(srcLevel), sh = s.levelHeight(srcLevel);
         final int cx0 = Math.max(0, x0), cy0 = Math.max(0, y0), cx1 = Math.min(sw, x1), cy1 = Math.min(sh, y1);
         if (cx1 <= cx0 || cy1 <= cy0) return;
         dx += cx0 - x0;
@@ -454,7 +461,7 @@ final class Textures {
         try (MemoryStack stack = MemoryStack.stackPush()) {
             if (s.format.vk() == dst.format.vk() || Formats.vkTexelBytes(s.format.vk()) == Formats.vkTexelBytes(dst.format.vk()) && !s.format.isDepthOrStencil() && !dst.format.isDepthOrStencil()) {
                 final VkImageCopy.Buffer r = VkImageCopy.calloc(1, stack);
-                r.srcSubresource().set(s.format.aspect(), src.colorLevel[0], src.colorLayer[0], 1);
+                r.srcSubresource().set(s.format.aspect(), srcLevel, srcLayer, 1);
                 r.srcOffset().set(cx0, cy0, 0);
                 r.dstSubresource().set(dst.format.aspect(), level, dstLayer, 1);
                 r.dstOffset().set(dx, dy, dst.is3D() ? dz : 0);
@@ -462,7 +469,7 @@ final class Textures {
                 vkCmdCopyImage(cmd, s.image, srcLayout, dst.image, dstLayout, r);
             } else {
                 final VkImageBlit.Buffer b = VkImageBlit.calloc(1, stack);
-                b.srcSubresource().set(s.format.aspect(), src.colorLevel[0], src.colorLayer[0], 1);
+                b.srcSubresource().set(s.format.aspect(), srcLevel, srcLayer, 1);
                 b.srcOffsets(0).set(cx0, cy0, 0);
                 b.srcOffsets(1).set(cx1, cy1, 1);
                 b.dstSubresource().set(dst.format.aspect(), level, dstLayer, 1);
