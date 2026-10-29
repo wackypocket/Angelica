@@ -46,6 +46,7 @@ public final class ImmediateExtendedAttribs implements ImmediateExtendedAttribHa
     private static volatile int currentProgramWants = 0;
 
     private static final Int2IntOpenHashMap programWantsExtCache = new Int2IntOpenHashMap();
+    static { programWantsExtCache.defaultReturnValue(-1); }
 
     public static void onProgramBound(int program) {
         if (program == 0) {
@@ -53,25 +54,32 @@ public final class ImmediateExtendedAttribs implements ImmediateExtendedAttribHa
             return;
         }
         int wants;
-        if (programWantsExtCache.containsKey(program)) {
+        synchronized (programWantsExtCache) {
             wants = programWantsExtCache.get(program);
-        } else {
+        }
+        if (wants < 0) {
             wants = 0;
             if (GLSMPrograms.glGetAttribLocation(program, "mc_midTexCoord") >= 0) wants |= WANTS_MID;
             if (GLSMPrograms.glGetAttribLocation(program, "at_tangent") >= 0) wants |= WANTS_TANGENT;
             if (GLSMPrograms.glGetAttribLocation(program, "iris_Entity") == LOC_ENTITY_IDS) wants |= WANTS_ENTITY_IDS;
-            programWantsExtCache.put(program, wants);
+            synchronized (programWantsExtCache) {
+                programWantsExtCache.put(program, wants);
+            }
         }
         currentProgramWants = wants;
     }
 
     public static void onProgramDeleted(int program) {
-        programWantsExtCache.remove(program);
+        synchronized (programWantsExtCache) {
+            programWantsExtCache.remove(program);
+        }
     }
 
     public static void onShaderPackChanged() {
         currentProgramWants = 0;
-        programWantsExtCache.clear();
+        synchronized (programWantsExtCache) {
+            programWantsExtCache.clear();
+        }
         ItemRenderListManager.clearCache();
         FfpExtendedAttribs.reset();
         TesrLifecycle.reset();

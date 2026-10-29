@@ -19,7 +19,11 @@ class BackendStartGuardTest {
     }
 
     private boolean boot(int revision) {
-        return BackendStartGuard.begin(dir.toFile(), true, false, revision, "");
+        return boot(revision, "");
+    }
+
+    private boolean boot(int revision, String driver) {
+        return BackendStartGuard.begin(dir.toFile(), true, false, revision, driver);
     }
 
     private File marker() {
@@ -60,5 +64,34 @@ class BackendStartGuardTest {
         assertFalse(boot(2));
         BackendStartGuard.arm();
         assertTrue(marker().isFile());
+    }
+
+    @Test
+    void strikesFromAnotherBackendDoNotCount() {
+        for (int i = 0; i < BackendStartGuard.STRIKE_LIMIT - 1; i++) {
+            assertFalse(boot(1, "vulkan"));
+            BackendStartGuard.arm();
+        }
+        assertFalse(boot(1, "native-vulkan"));
+        BackendStartGuard.arm();
+        assertFalse(boot(1, "native-vulkan"));
+        assertFalse(BackendStartGuard.tripped());
+    }
+
+    @Test
+    void verifiedBackendsStayVerifiedWhenAlternating() {
+        for (String driver : new String[] {"vulkan", "native-vulkan"}) {
+            assertFalse(boot(1, driver));
+            BackendStartGuard.arm();
+            BackendStartGuard.disarm();
+            BackendStartGuard.latch();
+        }
+        BackendStartGuard.arm();
+        assertFalse(boot(1, "vulkan"));
+        BackendStartGuard.arm();
+        assertFalse(marker().exists());
+        assertFalse(boot(1, "native-vulkan"));
+        BackendStartGuard.arm();
+        assertFalse(marker().exists());
     }
 }

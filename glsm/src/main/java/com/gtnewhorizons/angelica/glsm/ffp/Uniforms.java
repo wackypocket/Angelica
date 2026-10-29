@@ -29,7 +29,9 @@ import static com.gtnewhorizon.gtnhlib.bytebuf.MemoryUtilities.memAllocFloat;
 import static com.gtnewhorizon.gtnhlib.bytebuf.MemoryUtilities.memCalloc;
 import static com.gtnewhorizon.gtnhlib.bytebuf.MemoryUtilities.memFree;
 import static com.gtnewhorizon.gtnhlib.bytebuf.MemoryUtilities.memGetInt;
+import static com.gtnewhorizon.gtnhlib.bytebuf.MemoryUtilities.memGetLong;
 import static com.gtnewhorizon.gtnhlib.bytebuf.MemoryUtilities.memPutInt;
+import static com.gtnewhorizon.gtnhlib.bytebuf.MemoryUtilities.memPutLong;
 
 /**
  * Maintains the shared {@link FFPUniformBlock} image from GLSM cached state and streams it to the UBO ring.
@@ -42,7 +44,7 @@ public class Uniforms {
     private final long stagingAddress = memAddress0(staging);
     private UniformRingBuffer ring;
     private boolean bound;
-    private boolean contentChanged;
+    private long changed;
 
     private int mvGen = -1, mvLinearGen = -1, projGen = -1, texMatGen = -1;
     private int lightingGen = -1, fragmentGen = -1, colorGen = -1, normalGen = -1, texCoordGen = -1;
@@ -85,7 +87,7 @@ public class Uniforms {
 
     public void upload(GLContextState glCtx) {
         boolean dirty = false;
-        contentChanged = false;
+        changed = 0L;
 
         final int mvG = glCtx.mvGeneration;
         final int projG = glCtx.projGeneration;
@@ -218,7 +220,7 @@ public class Uniforms {
         }
 
         if (dirty || !bound) {
-            if (!contentChanged && bound) {
+            if (changed == 0L && bound) {
                 blockSkips++;
                 return;
             }
@@ -363,16 +365,20 @@ public class Uniforms {
     }
 
     private void putFloat(int offset, float v) {
-        final long a = stagingAddress + offset;
-        final int bits = Float.floatToRawIntBits(v);
-        if (memGetInt(a) != bits) contentChanged = true;
-        memPutInt(a, bits);
+        putInt(offset, Float.floatToRawIntBits(v));
     }
 
     private void putInt(int offset, int v) {
         final long a = stagingAddress + offset;
-        if (memGetInt(a) != v) contentChanged = true;
+        changed |= memGetInt(a) ^ v;
         memPutInt(a, v);
+    }
+
+    private void putPair(int offset, float x, float y) {
+        final long a = stagingAddress + offset;
+        final long v = Float.floatToRawIntBits(x) & 0xFFFFFFFFL | (long) Float.floatToRawIntBits(y) << 32;
+        changed |= memGetLong(a) ^ v;
+        memPutLong(a, v);
     }
 
     private void putMat4(int offset, Matrix4f m) {
@@ -403,15 +409,12 @@ public class Uniforms {
     }
 
     private void putVec4(int offset, float x, float y, float z, float w) {
-        putFloat(offset, x);
-        putFloat(offset + 4, y);
-        putFloat(offset + 8, z);
-        putFloat(offset + 12, w);
+        putPair(offset, x, y);
+        putPair(offset + 8, z, w);
     }
 
     private void putVec3(int offset, float x, float y, float z) {
-        putFloat(offset, x);
-        putFloat(offset + 4, y);
+        putPair(offset, x, y);
         putFloat(offset + 8, z);
     }
 

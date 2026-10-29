@@ -197,7 +197,7 @@ tasks.test {
     classpath = archScanAsm + classpath
     javaAgent(glsmMutableStaticsAgent)
     jvmArgs("-Dceleritas.lwjglService=org.taumc.celeritas.lwjgl.HeadlessTestLWJGLService")
-    dependsOn(":glsm:classes", ":lwjgl3-backend:classes", ":sdl-gpu:classes")
+    dependsOn(":glsm:classes", ":lwjgl3-backend:classes", ":sdl-gpu:classes", ":glemu:classes", ":vulkan:classes", ":metal:classes", ":directx12:classes")
 }
 
 val downgradeRootMainClasses = tasks.named<DowngradeFiles>("downgradeMainClasses")

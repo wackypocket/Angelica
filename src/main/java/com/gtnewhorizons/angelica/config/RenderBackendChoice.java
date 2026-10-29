@@ -3,8 +3,9 @@ package com.gtnewhorizons.angelica.config;
 import me.jellysquid.mods.sodium.client.gui.options.named.NamedState;
 
 public enum RenderBackendChoice implements NamedState {
-    OPENGL ("options.angelica.renderer.backend.opengl"),
-    SDL_GPU("options.angelica.renderer.backend.sdl_gpu");
+    OPENGL  ("options.angelica.renderer.backend.opengl"),
+    SDL_GPU ("options.angelica.renderer.backend.sdl_gpu"),
+    ANGELICA("options.angelica.renderer.backend.angelica");
 
     private final String key;
 

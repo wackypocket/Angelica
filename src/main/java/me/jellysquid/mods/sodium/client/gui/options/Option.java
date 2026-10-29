@@ -20,6 +20,8 @@ public interface Option<T> {
 
     void reset();
 
+    default void syncIfUnchanged() {}
+
     OptionStorage<?> getStorage();
 
     boolean isAvailable();

@@ -21,6 +21,7 @@ public final class FramePacer {
         boolean vsyncHonored();
         int displayGeneration();
         void awaitPresent();
+        void awaitFrameSlot();
         void readGateSample(GateSample out);
         void pumpDisplayMessages();
         void parkNanos(long nanos);
@@ -33,10 +34,26 @@ public final class FramePacer {
         @Override public boolean vsyncHonored() { return RENDER_BACKEND.vsyncHonored(); }
         @Override public int displayGeneration() { return RENDER_BACKEND.displayGeneration(); }
         @Override public void awaitPresent() { RENDER_BACKEND.awaitPresent(); }
+        @Override public void awaitFrameSlot() { RENDER_BACKEND.awaitFrameSlot(); }
         @Override public void readGateSample(GateSample out) { RENDER_BACKEND.readGateSample(out); }
         @Override public void pumpDisplayMessages() { GLStateManager.pumpDisplayMessages(); }
         @Override public void parkNanos(long nanos) { RENDER_BACKEND.parkNanos(nanos); }
         @Override public long nanoTime() { return System.nanoTime(); }
+    }
+
+    enum PaceState {
+        NONE,
+        LOCKED,
+        PROBING,
+        TIMER,
+        TIMER_FALLBACK
+    }
+
+    static PaceState paceState(VSyncMode mode, boolean honored, boolean locked, boolean probing) {
+        if (mode != VSyncMode.ON) return PaceState.NONE;
+        if (!honored) return PaceState.TIMER;
+        if (locked) return PaceState.LOCKED;
+        return probing ? PaceState.PROBING : PaceState.TIMER_FALLBACK;
     }
 
     private static final Tracy.ZoneId Z_PACER_WAIT = Tracy.zoneId("pacerBackpressure", Tracy.COLOR_SWAP);
@@ -62,6 +79,7 @@ public final class FramePacer {
     private static int lastDisplayGeneration;
 
     private static VSyncMode currentMode = VSyncMode.ON;
+    private static PaceState currentState = PaceState.NONE;
     private static int currentRefreshHz;
     private static int currentCapHz;
     private static int currentEffectiveCapHz;
@@ -70,8 +88,7 @@ public final class FramePacer {
     private static int loggedRefreshHz;
     private static int loggedCapHz;
     private static int loggedEffectiveCapHz;
-    private static boolean loggedLocked;
-    private static boolean loggedProbing;
+    private static PaceState loggedState;
 
     private FramePacer() {}
 
@@ -126,6 +143,7 @@ public final class FramePacer {
         if (mode == VSyncMode.ON && honored) {
             BACKEND.awaitPresent();
         }
+        BACKEND.awaitFrameSlot();
         BACKEND.readGateSample(sample);
         core.onGateSample(sample.durationNanos, sample.endNanos);
         core.onGpuWait(sample.gpuWaitNanos);
@@ -152,15 +170,15 @@ public final class FramePacer {
         core.markFrameStart(nanoTime());
 
         final int effectiveCapHz = core.effectiveCapHz();
-        final boolean locked = core.locked();
-        final boolean probing = core.probing();
+        final PaceState state = paceState(mode, honored, core.locked(), core.probing());
 
         currentMode = mode;
+        currentState = state;
         currentRefreshHz = refreshHz;
         currentCapHz = cap;
         currentEffectiveCapHz = effectiveCapHz;
 
-        maybeLog(mode, refreshHz, cap, effectiveCapHz, locked, probing);
+        maybeLog(mode, refreshHz, cap, effectiveCapHz, state);
 
         return core.lastPresentIntervalNanos();
     }
@@ -176,37 +194,39 @@ public final class FramePacer {
     }
 
 
-    private static void maybeLog(VSyncMode mode, int refreshHz, int capHz, int effectiveCapHz, boolean locked, boolean probing) {
+    private static void maybeLog(VSyncMode mode, int refreshHz, int capHz, int effectiveCapHz, PaceState state) {
         if (mode == loggedMode && refreshHz == loggedRefreshHz && capHz == loggedCapHz
-            && effectiveCapHz == loggedEffectiveCapHz && locked == loggedLocked && probing == loggedProbing) {
+            && effectiveCapHz == loggedEffectiveCapHz && state == loggedState) {
             return;
         }
         loggedMode = mode;
         loggedRefreshHz = refreshHz;
         loggedCapHz = capHz;
         loggedEffectiveCapHz = effectiveCapHz;
-        loggedLocked = locked;
-        loggedProbing = probing;
+        loggedState = state;
 
-        final String line = pacingLine(mode, refreshHz, capHz, effectiveCapHz, locked, probing);
-        final boolean wallClock = mode == VSyncMode.ON && !locked && !probing;
-        if (wallClock) AngelicaMod.LOGGER.warn(line);
+        final String line = pacingLine(mode, refreshHz, capHz, effectiveCapHz, state);
+        final boolean fallback = state == PaceState.TIMER_FALLBACK;
+        if (fallback) AngelicaMod.LOGGER.warn(line);
         else AngelicaMod.LOGGER.info(line);
-        Tracy.message(line, wallClock ? TracyBackend.SEVERITY_WARNING : TracyBackend.SEVERITY_INFO);
+        Tracy.message(line, fallback ? TracyBackend.SEVERITY_WARNING : TracyBackend.SEVERITY_INFO);
     }
 
-    static String pacingLine(VSyncMode mode, int refreshHz, int capHz, int effectiveCapHz, boolean locked, boolean probing) {
+    static String pacingLine(VSyncMode mode, int refreshHz, int capHz, int effectiveCapHz, PaceState state) {
         final StringBuilder sb = new StringBuilder("Frame pacing: ");
         sb.append(switch (mode) {
             case OFF -> "vsync off";
             case MAILBOX -> "mailbox";
             case ON -> "vsync";
+            case FIFO_LATEST_READY -> "fifo uncapped";
         });
         if (mode.tearFree() && refreshHz > 0) sb.append(' ').append(refreshHz).append("Hz");
-        if (mode == VSyncMode.ON) {
-            if (locked) sb.append(", hardware paced");
-            else if (probing) sb.append(", probing");
-            else sb.append(", driver not blocking, paced by wall clock");
+        switch (state) {
+            case LOCKED -> sb.append(", hardware paced");
+            case PROBING -> sb.append(", probing");
+            case TIMER -> sb.append(", paced by time");
+            case TIMER_FALLBACK -> sb.append(", driver is not holding frames to vblank, falling back to time pacing");
+            case NONE -> { }
         }
         if (capHz > 0) {
             sb.append(", cap ").append(capHz);
@@ -224,18 +244,24 @@ public final class FramePacer {
         return hz;
     }
 
-    static String debugIndicator(VSyncMode mode, int refreshHz, int capHz, int effectiveCapHz, boolean locked, boolean probing) {
+    static String debugIndicator(VSyncMode mode, int refreshHz, int capHz, int effectiveCapHz, PaceState state) {
         final int cap = Math.max(capHz, 0);
         final boolean showCap = cap > 0;
         if (!mode.tearFree() && !showCap) return null;
 
         final StringBuilder sb = new StringBuilder(" [");
         if (mode.tearFree()) {
-            sb.append(mode == VSyncMode.MAILBOX ? "mailbox" : "vsync");
+            sb.append(switch (mode) {
+                case MAILBOX -> "mailbox";
+                case FIFO_LATEST_READY -> "fifo uncapped";
+                default -> "vsync";
+            });
             if (refreshHz > 0) sb.append(' ').append(refreshHz);
-            if (mode == VSyncMode.ON) {
-                if (probing) sb.append(", probing");
-                else if (!locked) sb.append(", wall clock");
+            switch (state) {
+                case PROBING -> sb.append(", probing");
+                case TIMER -> sb.append(", time");
+                case TIMER_FALLBACK -> sb.append(", time fallback");
+                case LOCKED, NONE -> { }
             }
             if (showCap) sb.append(", cap ").append(cap).append(" -> ").append(effectiveCapHz);
         } else {
@@ -265,6 +291,6 @@ public final class FramePacer {
     public static boolean probing() { return core.probing(); }
 
     public static String debugIndicator() {
-        return debugIndicator(currentMode, currentRefreshHz, currentCapHz, currentEffectiveCapHz, core.locked(), core.probing());
+        return debugIndicator(currentMode, currentRefreshHz, currentCapHz, currentEffectiveCapHz, currentState);
     }
 }

@@ -31,6 +31,7 @@ import com.gtnewhorizons.angelica.debug.render.DebugGeometry;
 import com.gtnewhorizons.angelica.debug.render.DebugProgram;
 import com.gtnewhorizons.angelica.debug.render.DebugPrograms;
 import com.gtnewhorizons.angelica.debug.render.NativeScratch;
+import com.gtnewhorizons.angelica.debug.screen.DebugScreen;
 import com.gtnewhorizons.angelica.glsm.GLSMMatrices;
 import com.gtnewhorizons.angelica.glsm.streaming.TessellatorStreamingDrawer;
 import com.gtnewhorizons.angelica.rendering.celeritas.AngelicaRenderSectionManager;
@@ -64,6 +65,9 @@ public class ChunkDebugMinimap {
     private final NativeScratch scratch = new NativeScratch(BYTES);
     private final Matrix4f mvp = new Matrix4f();
     private long cursor;
+    private int builtTick = Integer.MIN_VALUE;
+    private int builtChunkX, builtChunkZ;
+    private int builtBytes;
 
     public static synchronized void enable() {
         if (enabled) return;
@@ -76,6 +80,7 @@ public class ChunkDebugMinimap {
         enabled = false;
         MinecraftForge.EVENT_BUS.unregister(INSTANCE);
         INSTANCE.scratch.free();
+        INSTANCE.builtTick = Integer.MIN_VALUE;
     }
 
     @SubscribeEvent
@@ -100,14 +105,21 @@ public class ChunkDebugMinimap {
         final int playerChunkX = ((int) Math.floor(pX)) >> 4;
         final int playerChunkZ = ((int) Math.floor(pZ)) >> 4;
 
-        scratch.ensure(BYTES);
-        cursor = scratch.address();
-        final ChunkProviderClient chunkProvider = (ChunkProviderClient) mc.theWorld.getChunkProvider();
+        final int tick = DebugScreen.clientTick();
+        if (tick != builtTick || playerChunkX != builtChunkX || playerChunkZ != builtChunkZ || scratch.address() == 0L) {
+            scratch.ensure(BYTES);
+            cursor = scratch.address();
+            final ChunkProviderClient chunkProvider = (ChunkProviderClient) mc.theWorld.getChunkProvider();
 
-        for (int x = playerChunkX - RANGE; x < playerChunkX + RANGE; x++) {
-            for (int z = playerChunkZ - RANGE; z < playerChunkZ + RANGE; z++) {
-                drawChunk(x, z, playerChunkX, playerChunkZ, manager, chunkProvider);
+            for (int x = playerChunkX - RANGE; x < playerChunkX + RANGE; x++) {
+                for (int z = playerChunkZ - RANGE; z < playerChunkZ + RANGE; z++) {
+                    drawChunk(x, z, playerChunkX, playerChunkZ, manager, chunkProvider);
+                }
             }
+            builtTick = tick;
+            builtChunkX = playerChunkX;
+            builtChunkZ = playerChunkZ;
+            builtBytes = (int) (cursor - scratch.address());
         }
 
         GLSMMatrices.getProjectionMatrix().mul(GLSMMatrices.getModelViewMatrix(), mvp).scale(2, 2, 1).translate(32, 32, 0);
@@ -117,8 +129,7 @@ public class ChunkDebugMinimap {
             final DebugProgram color = DebugPrograms.color();
             color.use();
             color.mvp(mvp);
-            final int bytes = (int) (cursor - scratch.address());
-            TessellatorStreamingDrawer.drawPacked(scratch.window(bytes), GL11.GL_QUADS, FLAGS, bytes / STRIDE);
+            TessellatorStreamingDrawer.drawPacked(scratch.window(builtBytes), GL11.GL_QUADS, FLAGS, builtBytes / STRIDE);
         } finally {
             scope.end();
         }

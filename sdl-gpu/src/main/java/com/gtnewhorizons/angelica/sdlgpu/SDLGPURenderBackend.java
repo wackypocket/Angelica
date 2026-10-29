@@ -278,6 +278,9 @@ public class SDLGPURenderBackend extends RenderBackend {
     }
 
     @Override public void init() {
+        MainThreadExec.runOnMainThread(() -> {
+            org.lwjgl.sdl.SDLHints.SDL_SetHint(org.lwjgl.sdl.SDLHints.SDL_HINT_VIDEO_MAC_FULLSCREEN_MENU_VISIBILITY, "1");
+        });
         final boolean lwjglDebugFlag = GLStateManager.getInitConfig() != null && GLStateManager.getInitConfig().isLwjglDebug();
         final boolean enableMarkers = lwjglDebugFlag || CaptureGate.enabledAtStartup();
         debugLabels = new DebugLabels(frameManager, enableMarkers);
@@ -487,6 +490,47 @@ public class SDLGPURenderBackend extends RenderBackend {
     }
 
     @Override public void pumpDisplayMessages() { Pump.INSTANCE.pumpMessages(); }
+
+    private final int[] windowedBounds = new int[4];
+    private boolean hasWindowedBounds;
+
+    @Override public void saveWindowedBounds() {
+        final long window = org.lwjglx.opengl.Display.getWindow();
+        if (window == 0L) return;
+        MainThreadExec.runOnMainThread(() -> {
+            if ((org.lwjgl.sdl.SDLVideo.SDL_GetWindowFlags(window) & org.lwjgl.sdl.SDLVideo.SDL_WINDOW_FULLSCREEN) != 0L) return;
+            try (org.lwjgl.system.MemoryStack stack = org.lwjgl.system.MemoryStack.stackPush()) {
+                final java.nio.IntBuffer x = stack.mallocInt(1), y = stack.mallocInt(1), w = stack.mallocInt(1), h = stack.mallocInt(1);
+                org.lwjgl.sdl.SDLVideo.SDL_GetWindowPosition(window, x, y);
+                org.lwjgl.sdl.SDLVideo.SDL_GetWindowSize(window, w, h);
+                windowedBounds[0] = x.get(0);
+                windowedBounds[1] = y.get(0);
+                windowedBounds[2] = w.get(0);
+                windowedBounds[3] = h.get(0);
+                hasWindowedBounds = w.get(0) > 1 && h.get(0) > 1;
+            }
+        });
+    }
+
+    @Override public void restoreWindowedBounds() {
+        final long window = org.lwjglx.opengl.Display.getWindow();
+        if (window == 0L || !hasWindowedBounds) return;
+        MainThreadExec.runOnMainThread(() -> {
+            org.lwjgl.sdl.SDLVideo.SDL_RestoreWindow(window);
+            org.lwjgl.sdl.SDLVideo.SDL_SetWindowSize(window, windowedBounds[2], windowedBounds[3]);
+            org.lwjgl.sdl.SDLVideo.SDL_SetWindowPosition(window, windowedBounds[0], windowedBounds[1]);
+            org.lwjgl.sdl.SDLVideo.SDL_SyncWindow(window);
+        });
+    }
+
+    @Override public boolean tracksWindowFullscreen() { return true; }
+
+    @Override public boolean isWindowFullscreen() {
+        final long window = org.lwjglx.opengl.Display.getWindow();
+        if (window == 0L) return false;
+        return MainThreadExec.runOnMainThread((java.util.function.BooleanSupplier) () ->
+            (org.lwjgl.sdl.SDLVideo.SDL_GetWindowFlags(window) & org.lwjgl.sdl.SDLVideo.SDL_WINDOW_FULLSCREEN) != 0L);
+    }
 
     @Override public void shutdown() {
         if (shutdown) return;

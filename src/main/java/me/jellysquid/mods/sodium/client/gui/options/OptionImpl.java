@@ -94,6 +94,16 @@ public class OptionImpl<S, T> implements OptionExtended<T> {
     }
 
     @Override
+    public void syncIfUnchanged() {
+        if (this.hasChanged()) return;
+        final T current = this.binding.getValue(this.storage.getData());
+        if (!current.equals(this.value)) {
+            this.value = current;
+            this.modifiedValue = current;
+        }
+    }
+
+    @Override
     public OptionStorage<?> getStorage() {
         return this.storage;
     }

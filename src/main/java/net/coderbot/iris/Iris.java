@@ -403,6 +403,14 @@ public class Iris {
             return;
         }
 
+        final String blocker = BackendManager.RENDER_BACKEND.shaderPackBlocker();
+        if (blocker != null) {
+            logger.warn("Falling back to normal rendering without shaders because {}", blocker);
+            setShadersDisabled();
+            fallback = true;
+            return;
+        }
+
         // Attempt to load an external shaderpack if it is available
         final Optional<String> externalName = irisConfig.getShaderPackName();
 

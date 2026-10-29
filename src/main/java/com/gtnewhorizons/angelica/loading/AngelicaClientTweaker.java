@@ -17,7 +17,10 @@ import com.gtnewhorizons.angelica.glsm.loading.Lwjgl3ifyExclusions;
 import com.gtnewhorizons.angelica.glsm.profiling.TracyOptions;
 import com.gtnewhorizons.angelica.loading.fml.compat.CompatHandlers;
 import com.gtnewhorizons.angelica.lwjgl3.MissingDependencySdl;
+import com.gtnewhorizons.angelica.dx12.Dx12Gate;
+import com.gtnewhorizons.angelica.metal.MetalGate;
 import com.gtnewhorizons.angelica.sdlgpu.SDLGPUGate;
+import com.gtnewhorizons.angelica.vulkan.VulkanGate;
 import com.gtnewhorizons.angelica.mixins.Mixins;
 import cpw.mods.fml.relauncher.FMLLaunchHandler;
 import cpw.mods.fml.relauncher.FMLRelaunchLog;
@@ -73,11 +76,17 @@ public final class AngelicaClientTweaker implements IFMLLoadingPlugin, IEarlyMix
             // Angelica Config
             ConfigurationManager.registerConfig(AngelicaConfig.class);
             TracyOptions.latch(AngelicaConfig.enableTracy, AngelicaConfig.tracyAllowRemote, AngelicaConfig.tracyFineZones, AngelicaConfig.tracyMaxSrcLocs);
-            if (BackendStartGuard.begin(new File(Launch.minecraftHome, "angelica"), AngelicaConfig.sdlGpuConfigured(), SystemProperties.SDL_GPU_OVERRIDE != null, SDLGPUGate.REQUIREMENTS_REVISION, BackendOptions.sdlGpuDriver(AngelicaConfig.sdlGpuDriverName()))) {
+            final boolean angelica = AngelicaConfig.angelicaConfigured();
+            final boolean metal = angelica && BackendOptions.DRIVER_METAL.equals(BackendOptions.angelicaDriver(AngelicaConfig.angelicaDriverName()));
+            final boolean dx12 = angelica && BackendOptions.DRIVER_DX12.equals(BackendOptions.angelicaDriver(AngelicaConfig.angelicaDriverName()));
+            final int guardRevision = angelica ? (dx12 ? Dx12Gate.REQUIREMENTS_REVISION : metal ? MetalGate.REQUIREMENTS_REVISION : VulkanGate.REQUIREMENTS_REVISION) : SDLGPUGate.REQUIREMENTS_REVISION;
+            final String guardKey = angelica ? (dx12 ? Dx12Gate.GUARD_KEY : metal ? MetalGate.GUARD_KEY : VulkanGate.GUARD_KEY) : BackendOptions.sdlGpuDriver(AngelicaConfig.sdlGpuDriverName());
+            if (BackendStartGuard.begin(new File(Launch.minecraftHome, "angelica"), AngelicaConfig.sdlGpuConfigured() || angelica,
+                SystemProperties.SDL_GPU_OVERRIDE != null || BackendOptions.angelicaOverride() != null, guardRevision, guardKey)) {
                 AngelicaConfig.renderBackend = RenderBackendChoice.OPENGL;
                 ConfigurationManager.save(AngelicaConfig.class);
             }
-            BackendOptions.latch(AngelicaConfig.sdlGpuConfigured(), AngelicaConfig.sdlGpuDriverName(), AngelicaConfig.glVersion);
+            BackendOptions.latch(AngelicaConfig.sdlGpuConfigured(), AngelicaConfig.angelicaConfigured(), AngelicaConfig.sdlGpuDriverName(), AngelicaConfig.angelicaDriverName(), AngelicaConfig.glVersion);
             ConfigurationManager.registerConfig(CompatConfig.class);
             ConfigurationManager.registerConfig(FontConfig.class);
             MCPatcherForgeConfig.registerConfig();
@@ -99,6 +108,27 @@ public final class AngelicaClientTweaker implements IFMLLoadingPlugin, IEarlyMix
             DependencyVerifier.gtnhLibChecks("Angelica"), LOGGER,
             (title, message) -> MissingDependencySdl.showFatal(title, message));
 
+        if (VulkanGate.isRequested()) {
+            if (VulkanGate.isVulkanAvailable()) {
+                LOGGER.info("Angelica renderer requested on Vulkan");
+            } else {
+                LOGGER.warn("Angelica renderer unavailable on Vulkan, running on OpenGL: {}", VulkanGate.missingRequirement());
+            }
+        }
+        if (MetalGate.isRequested()) {
+            if (MetalGate.isMetalAvailable()) {
+                LOGGER.info("Angelica renderer requested on Metal");
+            } else {
+                LOGGER.warn("Angelica renderer unavailable on Metal, running on OpenGL: {}", MetalGate.missingRequirement());
+            }
+        }
+        if (Dx12Gate.isRequested()) {
+            if (Dx12Gate.isDx12Available()) {
+                LOGGER.info("Angelica renderer requested on Direct3D 12");
+            } else {
+                LOGGER.warn("Angelica renderer unavailable on Direct3D 12, running on OpenGL: {}", Dx12Gate.missingRequirement());
+            }
+        }
         if (BackendOptions.sdlGpuRequested()) {
             if (SDLGPUGate.isSDLGPUAvailable()) {
                 LOGGER.info("SDL GPU window mode enabled");

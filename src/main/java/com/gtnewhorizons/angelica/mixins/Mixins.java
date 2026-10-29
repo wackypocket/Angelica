@@ -9,7 +9,10 @@ import com.gtnewhorizons.angelica.config.SystemProperties;
 import com.gtnewhorizons.angelica.glsm.CaptureGate;
 import com.gtnewhorizons.angelica.glsm.backend.BackendOptions;
 import com.gtnewhorizons.angelica.glsm.profiling.TracyOptions;
+import com.gtnewhorizons.angelica.dx12.Dx12Gate;
+import com.gtnewhorizons.angelica.metal.MetalGate;
 import com.gtnewhorizons.angelica.sdlgpu.SDLGPUGate;
+import com.gtnewhorizons.angelica.vulkan.VulkanGate;
 import jss.notfine.config.MCPatcherForgeConfig;
 import jss.notfine.config.NotFineConfig;
 import lombok.Getter;
@@ -26,6 +29,7 @@ public enum Mixins implements IMixins {
         .setPhase(Phase.EARLY)
         .addClientMixins(
             "angelica.startup.MixinInitGLStateManager"
+            , "angelica.startup.MixinSplashProgressEventPump"
         )
     ),
 
@@ -138,6 +142,33 @@ public enum Mixins implements IMixins {
         .addClientMixins(
             "sdlgpu.MixinForgeHooksClient_SDLGPUDisplay",
             "sdlgpu.MixinMinecraft_SDLGPUIcons"
+        )
+    ),
+
+    ANGELICA_VULKAN_DISPLAY(new MixinBuilder("Vulkan backend Display.create path")
+        .setPhase(Phase.EARLY)
+        .setApplyIf(() -> VulkanGate.isRequested() && VulkanGate.isVulkanAvailable())
+        .addClientMixins(
+            "vulkan.MixinForgeHooksClient_VulkanDisplay",
+            "vulkan.MixinMinecraft_VulkanIcons"
+        )
+    ),
+
+    ANGELICA_METAL_DISPLAY(new MixinBuilder("Metal backend Display.create path")
+        .setPhase(Phase.EARLY)
+        .setApplyIf(() -> MetalGate.isRequested() && MetalGate.isMetalAvailable())
+        .addClientMixins(
+            "metal.MixinForgeHooksClient_MetalDisplay",
+            "metal.MixinMinecraft_MetalIcons"
+        )
+    ),
+
+    ANGELICA_DX12_DISPLAY(new MixinBuilder("Direct3D 12 backend Display.create path")
+        .setPhase(Phase.EARLY)
+        .setApplyIf(() -> Dx12Gate.isRequested() && Dx12Gate.isDx12Available())
+        .addClientMixins(
+            "dx12.MixinForgeHooksClient_Dx12Display",
+            "dx12.MixinMinecraft_Dx12Icons"
         )
     ),
 

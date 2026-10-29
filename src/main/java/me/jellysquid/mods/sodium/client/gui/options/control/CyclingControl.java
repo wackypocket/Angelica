@@ -7,9 +7,11 @@ import me.jellysquid.mods.sodium.client.util.Dim2i;
 import net.minecraft.client.resources.I18n;
 import org.apache.commons.lang3.Validate;
 
+import java.util.function.Supplier;
+
 public class CyclingControl<T extends Enum<T>> implements Control<T> {
     private final Option<T> option;
-    private final T[] allowedValues;
+    private final Supplier<T[]> allowedValues;
     private final String[] names;
 
     public CyclingControl(Option<T> option, Class<T> enumType) {
@@ -23,7 +25,7 @@ public class CyclingControl<T extends Enum<T>> implements Control<T> {
         Validate.notEmpty(universe, "The enum universe must contain at least one item");
 
         this.option = option;
-        this.allowedValues = universe;
+        this.allowedValues = () -> universe;
         this.names = names;
     }
 
@@ -34,6 +36,14 @@ public class CyclingControl<T extends Enum<T>> implements Control<T> {
         Validate.notEmpty(allowedValues, "There must be at least one allowed value");
 
         this.option = option;
+        this.allowedValues = () -> allowedValues;
+        this.names = names;
+    }
+
+    public CyclingControl(Option<T> option, Class<T> enumType, Supplier<T[]> allowedValues, String[] names) {
+        Validate.isTrue(enumType.getEnumConstants().length == names.length, "Mismatch between universe length and names array length");
+
+        this.option = option;
         this.allowedValues = allowedValues;
         this.names = names;
     }
@@ -42,7 +52,7 @@ public class CyclingControl<T extends Enum<T>> implements Control<T> {
         final T[] universe = enumType.getEnumConstants();
 
         this.option = option;
-        this.allowedValues = allowedValues;
+        this.allowedValues = () -> allowedValues;
         this.names = new String[universe.length];
 
         for (int i = 0; i < this.names.length; i++) {

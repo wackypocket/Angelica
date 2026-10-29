@@ -1,8 +1,6 @@
-package com.gtnewhorizons.angelica.sdlgpu.shader;
+package com.gtnewhorizons.angelica.glsm.shader;
 
-import com.gtnewhorizons.angelica.glsm.shader.GlslVulkanPreprocess;
 import com.gtnewhorizons.angelica.glsm.shader.GlslVulkanPreprocess.Edit;
-import com.gtnewhorizons.angelica.glsm.shader.ShaderIndex;
 import org.antlr.v4.runtime.ParserRuleContext;
 import org.antlr.v4.runtime.Token;
 import org.antlr.v4.runtime.tree.ParseTree;

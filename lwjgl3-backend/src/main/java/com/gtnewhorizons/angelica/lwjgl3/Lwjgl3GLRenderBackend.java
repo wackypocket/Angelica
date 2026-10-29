@@ -85,6 +85,9 @@ public final class Lwjgl3GLRenderBackend extends RenderBackend {
 
     @Override
     public void init() {
+        me.eigenraven.lwjgl3ify.client.MainThreadExec.runOnMainThread(() -> {
+            org.lwjgl.sdl.SDLHints.SDL_SetHint(org.lwjgl.sdl.SDLHints.SDL_HINT_VIDEO_MAC_FULLSCREEN_MENU_VISIBILITY, "1");
+        });
         caps = GL.getCapabilities();
         if (GLStateManager.isWindows()) {
             final String vendor = GL11C.glGetString(GL11C.GL_VENDOR);
@@ -237,6 +240,51 @@ public final class Lwjgl3GLRenderBackend extends RenderBackend {
     @Override
     public void pumpDisplayMessages() {
         Pump.INSTANCE.pumpMessages();
+    }
+
+    private final int[] windowedBounds = new int[4];
+    private boolean hasWindowedBounds;
+
+    @Override
+    public void saveWindowedBounds() {
+        final long window = Display.getWindow();
+        if (window == 0L) return;
+        me.eigenraven.lwjgl3ify.client.MainThreadExec.runOnMainThread(() -> {
+            if ((org.lwjgl.sdl.SDLVideo.SDL_GetWindowFlags(window) & org.lwjgl.sdl.SDLVideo.SDL_WINDOW_FULLSCREEN) != 0L) return;
+            try (org.lwjgl.system.MemoryStack stack = org.lwjgl.system.MemoryStack.stackPush()) {
+                final java.nio.IntBuffer x = stack.mallocInt(1), y = stack.mallocInt(1), w = stack.mallocInt(1), h = stack.mallocInt(1);
+                org.lwjgl.sdl.SDLVideo.SDL_GetWindowPosition(window, x, y);
+                org.lwjgl.sdl.SDLVideo.SDL_GetWindowSize(window, w, h);
+                windowedBounds[0] = x.get(0);
+                windowedBounds[1] = y.get(0);
+                windowedBounds[2] = w.get(0);
+                windowedBounds[3] = h.get(0);
+                hasWindowedBounds = w.get(0) > 1 && h.get(0) > 1;
+            }
+        });
+    }
+
+    @Override
+    public boolean tracksWindowFullscreen() { return true; }
+
+    @Override
+    public boolean isWindowFullscreen() {
+        final long window = Display.getWindow();
+        if (window == 0L) return false;
+        return me.eigenraven.lwjgl3ify.client.MainThreadExec.runOnMainThread((java.util.function.BooleanSupplier) () ->
+            (org.lwjgl.sdl.SDLVideo.SDL_GetWindowFlags(window) & org.lwjgl.sdl.SDLVideo.SDL_WINDOW_FULLSCREEN) != 0L);
+    }
+
+    @Override
+    public void restoreWindowedBounds() {
+        final long window = Display.getWindow();
+        if (window == 0L || !hasWindowedBounds) return;
+        me.eigenraven.lwjgl3ify.client.MainThreadExec.runOnMainThread(() -> {
+            org.lwjgl.sdl.SDLVideo.SDL_RestoreWindow(window);
+            org.lwjgl.sdl.SDLVideo.SDL_SetWindowSize(window, windowedBounds[2], windowedBounds[3]);
+            org.lwjgl.sdl.SDLVideo.SDL_SetWindowPosition(window, windowedBounds[0], windowedBounds[1]);
+            org.lwjgl.sdl.SDLVideo.SDL_SyncWindow(window);
+        });
     }
 
     @Override

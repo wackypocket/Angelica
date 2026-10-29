@@ -200,8 +200,8 @@ public class StandardMacros {
 	 * @see <a href="https://github.com/sp614x/optifine/blob/9c6a5b5326558ccc57c6490b66b3be3b2dc8cbef/OptiFineDoc/doc/shaders.txt#L709-L714">Optifine Doc</a>
 	 */
 	public static String getOsString() {
-        // Force MC_OS_LINUX under SDL_GPU on Mac to avoid shaderpack gates!
-        if (BackendManager.RENDER_BACKEND.isSDLGPU() && LWJGLUtil.getPlatform() == LWJGLUtil.PLATFORM_MACOSX) {
+        final boolean modernBackend = BackendManager.RENDER_BACKEND.isSDLGPU() || BackendManager.RENDER_BACKEND.isAngelicaNative();
+        if (modernBackend && LWJGLUtil.getPlatform() == LWJGLUtil.PLATFORM_MACOSX) {
             return "MC_OS_LINUX";
         }
         return switch (LWJGLUtil.getPlatform()) {

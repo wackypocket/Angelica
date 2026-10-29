@@ -59,6 +59,12 @@ public abstract class RenderBackend {
     public boolean isIndirectRequired() { return false; }
     public boolean supportsGeometryShaders() { return true; }
     public boolean isSDLGPU() { return false; }
+    public boolean isVulkan() { return false; }
+    public boolean isMetal() { return false; }
+    public boolean isDx12() { return false; }
+    public boolean supportsInPlaceMappedWrites() { return false; }
+    public boolean isAngelicaNative() { return isVulkan() || isMetal() || isDx12(); }
+    public String shaderPackBlocker() { return null; }
 
     public boolean framebufferCompletenessIsMeaningful() { return true; }
     public void onPersistentBufferWrite(int glId, long offset, long size) {}
@@ -113,7 +119,7 @@ public abstract class RenderBackend {
 
     public final boolean vsyncHonored() { return vsyncHonored; }
 
-    public boolean supportsVSyncMode(VSyncMode mode) { return mode != VSyncMode.MAILBOX; }
+    public boolean supportsVSyncMode(VSyncMode mode) { return mode == VSyncMode.OFF || mode == VSyncMode.ON; }
 
     protected final void publishVSyncMode(VSyncMode mode) {
         effectiveVSyncMode = mode;
@@ -234,6 +240,8 @@ public abstract class RenderBackend {
 
     public void awaitPresent() {}
 
+    public void awaitFrameSlot() {}
+
     public void parkNanos(long nanos) {
         LockSupport.parkNanos(nanos);
     }
@@ -241,6 +249,16 @@ public abstract class RenderBackend {
     public void pumpDisplayMessages() {
         Display.processMessages();
     }
+
+    public boolean canPumpDisplayMessagesOffThread() { return true; }
+
+    public boolean tracksWindowFullscreen() { return false; }
+
+    public boolean isWindowFullscreen() { return Display.isFullscreen(); }
+
+    public void saveWindowedBounds() {}
+
+    public void restoreWindowedBounds() {}
 
     private boolean presentSuppressed;
 

@@ -7,6 +7,7 @@ import com.gtnewhorizons.angelica.glsm.hooks.PerFrameUniformBlock;
 import com.gtnewhorizons.angelica.glsm.hooks.PerFrameUniformBlock.Member;
 import com.gtnewhorizons.angelica.glsm.shader.GlslVulkanPreprocess;
 import com.gtnewhorizons.angelica.glsm.shader.GlslVulkanPreprocess.Edit;
+import com.gtnewhorizons.angelica.glsm.shader.DerivativeHoisting;
 import com.gtnewhorizons.angelica.glsm.shader.ShaderCacheIO;
 import com.gtnewhorizons.angelica.glsm.shader.ShaderDiskCache;
 import com.gtnewhorizons.angelica.glsm.shader.ShaderIndex;

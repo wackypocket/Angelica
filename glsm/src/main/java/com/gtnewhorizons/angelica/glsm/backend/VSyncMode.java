@@ -3,7 +3,8 @@ package com.gtnewhorizons.angelica.glsm.backend;
 public enum VSyncMode {
     OFF,
     ON,
-    MAILBOX;
+    MAILBOX,
+    FIFO_LATEST_READY;
 
     public boolean tearFree() {
         return this != OFF;

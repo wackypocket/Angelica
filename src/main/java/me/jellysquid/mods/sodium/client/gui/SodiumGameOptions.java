@@ -209,7 +209,7 @@ public class SodiumGameOptions {
     }
 
     public static class AdvancedSettings {
-        public VSyncMode vsyncMode;
+        public VSyncMode presentMode;
         public boolean useVertexArrayObjects = true;
         public MultiDrawMode multiDrawMode = MultiDrawMode.DIRECT;
 

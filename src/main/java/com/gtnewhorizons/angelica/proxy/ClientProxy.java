@@ -7,7 +7,6 @@ import com.gtnewhorizons.angelica.debug.screen.DebugScreenOverlay;
 import com.gtnewhorizons.angelica.rendering.culling.GpuCulling;
 import static com.gtnewhorizons.angelica.AngelicaMod.MOD_ID;
 
-import java.io.IOException;
 import java.lang.management.ManagementFactory;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -58,9 +57,9 @@ import com.gtnewhorizons.angelica.debug.TPSGraph;
 import com.gtnewhorizons.angelica.dynamiclights.DynamicLights;
 import com.gtnewhorizons.angelica.dynamiclights.config.EntityLightConfig;
 import com.gtnewhorizons.angelica.glsm.GLStateManager;
+import com.gtnewhorizons.angelica.glsm.backend.VSyncMode;
 import com.gtnewhorizons.angelica.glsm.backend.BackendManager;
 import com.gtnewhorizons.angelica.glsm.backend.BackendStartGuard;
-import com.gtnewhorizons.angelica.glsm.backend.VSyncMode;
 import com.gtnewhorizons.angelica.glsm.profiling.Tracy;
 import com.gtnewhorizons.angelica.glsm.texture.TextureInfoCache;
 import com.gtnewhorizons.angelica.hudcaching.HUDCaching;
@@ -122,14 +121,7 @@ public final class ClientProxy extends CommonProxy {
     }
 
     public static void toggleVSync(boolean enabled) {
-        final SodiumGameOptions opts = options();
-        opts.advanced.vsyncMode = enabled ? GLStateManager.preferredTearFreeMode() : VSyncMode.OFF;
-        try {
-            opts.writeChanges();
-        } catch (IOException e) {
-            AngelicaMod.LOGGER.warn("Could not persist the vsync mode", e);
-        }
-        GLStateManager.setVSyncMode(opts.advanced.vsyncMode);
+        GLStateManager.setVSyncEnabled(enabled);
     }
 
     @Override
@@ -164,12 +156,8 @@ public final class ClientProxy extends CommonProxy {
         CeleritasSetup.ensureInitialized();
         TextureSamplers.initRenderer();
         DarkModeUtils.init();
-        final SodiumGameOptions opts = options();
-        if (opts.advanced.vsyncMode == null) {
-            opts.advanced.vsyncMode = FrameRateOptions.defaultMode();
-        }
-        Minecraft.getMinecraft().gameSettings.enableVsync = opts.advanced.vsyncMode.tearFree();
-        GLStateManager.setVSyncPreference(opts.advanced.vsyncMode);
+        final VSyncMode stored = options().advanced.presentMode;
+        GLStateManager.setVSyncPreference(stored != null && stored.tearFree() ? stored : VSyncMode.ON);
         FramePacer.setIdleWork(deadlineNanos -> {
             final CeleritasWorldRenderer renderer = CeleritasWorldRenderer.getInstanceOrNull();
             if (renderer != null) renderer.runFrameIdleWork(deadlineNanos);
@@ -317,7 +305,7 @@ public final class ClientProxy extends CommonProxy {
 
     @SubscribeEvent(priority = EventPriority.LOWEST)
     public void onGuiOpen(GuiOpenEvent event) {
-        if (BackendManager.RENDER_BACKEND.isSDLGPU()) BackendStartGuard.latch();
+        if (BackendManager.RENDER_BACKEND.isSDLGPU() || BackendManager.RENDER_BACKEND.isAngelicaNative()) BackendStartGuard.latch();
         if (!event.isCanceled()) {
             if (event.gui instanceof GuiMainMenu && gameStartTime == -1) {
                 gameStartTime = ManagementFactory.getRuntimeMXBean().getUptime() / 1000f;

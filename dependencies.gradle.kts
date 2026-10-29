@@ -93,9 +93,16 @@ DependencyHandlerScope.of(dependencies).apply {
     shadowImplementation(project(":glsm")) { isTransitive = false }
     shadowImplementation(project(":lwjgl3-backend")) { isTransitive = false }
     shadowImplementation(project(":sdl-gpu")) { isTransitive = false }
+    shadowImplementation(project(":glemu")) { isTransitive = false }
+    shadowImplementation(project(":vulkan")) { isTransitive = false }
+    shadowImplementation(project(":metal")) { isTransitive = false }
+    shadowImplementation(project(":directx12")) { isTransitive = false }
     runtimeOnlyNonPublishable(project(":tracy-client")) { isTransitive = false }
     if (System.getProperty("os.name").lowercase().contains("mac")) {
         runtimeOnlyNonPublishable(project(":moltenvk")) { isTransitive = false }
+    }
+    if (System.getProperty("os.name").lowercase().startsWith("windows")) {
+        runtimeOnlyNonPublishable(project(":dxc")) { isTransitive = false }
     }
     devOnlyNonPublishable(libs.async.profiler)
     shadowImplementation(libs.eventbus)

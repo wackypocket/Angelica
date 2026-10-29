@@ -486,7 +486,7 @@ public class AngelicaConfig {
     @Config.RequiresMcRestart
     public static int glVersion;
 
-    @Config.Comment("Render backend: OPENGL, or SDL_GPU (experimental; Vulkan/Metal/Direct3D 12 through SDL3, falls back to OpenGL when no device can be created). -Dangelica.sdlgpu.enable=true|false overrides this.")
+    @Config.Comment("Render backend: OPENGL, SDL_GPU (experimental; Vulkan/Metal/Direct3D 12 through SDL3) or ANGELICA (experimental; Angelica's own Vulkan or Metal renderer, see angelicaDriver). Both fall back to OpenGL when no device can be created. -Dangelica.sdlgpu.enable, -Dangelica.vulkan and -Dangelica.metal override this.")
     @Config.DefaultEnum("OPENGL")
     @Config.RequiresMcRestart
     public static RenderBackendChoice renderBackend;
@@ -495,6 +495,11 @@ public class AngelicaConfig {
     @Config.DefaultEnum("AUTO")
     @Config.RequiresMcRestart
     public static SdlGpuDriver sdlGpuDriver;
+
+    @Config.Comment("Angelica renderer driver: AUTO (Metal on macOS, Vulkan elsewhere), VULKAN or METAL (macOS). Vulkan on macOS needs MoltenVK. -Dangelica.vulkan=true or -Dangelica.metal=true overrides this.")
+    @Config.DefaultEnum("AUTO")
+    @Config.RequiresMcRestart
+    public static AngelicaDriver angelicaDriver;
 
     @Config.Comment("Disables GL Error checks. Always set to false in dev env or if LWJGL debug is on. Improves performance.")
     @Config.DefaultBoolean(true)
@@ -570,6 +575,14 @@ public class AngelicaConfig {
 
     public static boolean sdlGpuConfigured() {
         return renderBackend == RenderBackendChoice.SDL_GPU;
+    }
+
+    public static boolean angelicaConfigured() {
+        return renderBackend == RenderBackendChoice.ANGELICA;
+    }
+
+    public static String angelicaDriverName() {
+        return angelicaDriver == null ? "" : angelicaDriver.driverName();
     }
 
     public static String sdlGpuDriverName() {

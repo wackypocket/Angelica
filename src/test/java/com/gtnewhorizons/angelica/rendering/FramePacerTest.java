@@ -30,10 +30,12 @@ class FramePacerTest {
         long now;
 
         int awaitPresentCalls;
+        int awaitFrameSlotCalls;
         int readGateSampleCalls;
         int parkCalls;
         int pumpCalls;
         boolean awaitedBeforeRead;
+        boolean slotAwaitedBeforeRead;
         boolean readBeforePump;
         boolean parkedBeforePump;
 
@@ -63,9 +65,15 @@ class FramePacerTest {
         }
 
         @Override
+        public void awaitFrameSlot() {
+            awaitFrameSlotCalls++;
+        }
+
+        @Override
         public void readGateSample(GateSample out) {
             readGateSampleCalls++;
             awaitedBeforeRead = awaitPresentCalls > 0;
+            slotAwaitedBeforeRead = awaitFrameSlotCalls > 0;
             out.durationNanos = gateDurationNanos;
             out.endNanos = gateEndNanos;
             out.gpuWaitNanos = gpuWaitNanos;
@@ -106,8 +114,7 @@ class FramePacerTest {
         Reflect.setStatic(FramePacer.class, "loggedRefreshHz", 0);
         Reflect.setStatic(FramePacer.class, "loggedCapHz", 0);
         Reflect.setStatic(FramePacer.class, "loggedEffectiveCapHz", 0);
-        Reflect.setStatic(FramePacer.class, "loggedLocked", false);
-        Reflect.setStatic(FramePacer.class, "loggedProbing", false);
+        Reflect.setStatic(FramePacer.class, "loggedState", null);
     }
 
     private static void withBackend(FramePacer.Backend fake, Runnable body) {
@@ -120,33 +127,48 @@ class FramePacerTest {
         }
     }
 
-    @ParameterizedTest(name = "{0} refresh={1} cap={2}->{3} locked={4} probing={5}")
+    @ParameterizedTest(name = "{0} refresh={1} cap={2}->{3} state={4}")
     @CsvSource(nullValues = "null", value = {
-        "ON, 60, 0, 0, true, false, ' [vsync 60]'",
-        "ON, 60, 30, 30, true, false, ' [vsync 60, cap 30 -> 30]'",
-        "ON, 144, 50, 48, true, false, ' [vsync 144, cap 50 -> 48]'",
-        "MAILBOX, 144, 0, 0, false, false, ' [mailbox 144]'",
-        "OFF, 144, 100, 100, false, false, ' [cap 100]'",
-        "ON, 60, 0, 0, false, true, ' [vsync 60, probing]'",
-        "ON, 60, 0, 0, false, false, ' [vsync 60, wall clock]'",
-        "OFF, 144, 0, 0, false, false, null",
+        "ON, 60, 0, 0, LOCKED, ' [vsync 60]'",
+        "ON, 60, 30, 30, LOCKED, ' [vsync 60, cap 30 -> 30]'",
+        "ON, 144, 50, 48, LOCKED, ' [vsync 144, cap 50 -> 48]'",
+        "MAILBOX, 144, 0, 0, NONE, ' [mailbox 144]'",
+        "OFF, 144, 100, 100, NONE, ' [cap 100]'",
+        "ON, 60, 0, 0, PROBING, ' [vsync 60, probing]'",
+        "ON, 60, 0, 0, TIMER, ' [vsync 60, time]'",
+        "ON, 60, 0, 0, TIMER_FALLBACK, ' [vsync 60, time fallback]'",
+        "OFF, 144, 0, 0, NONE, null",
     })
-    void theIndicatorNamesEveryPacingState(VSyncMode mode, int refreshHz, int capHz, int effectiveCapHz, boolean locked, boolean probing, String expected) {
-        assertEquals(expected, FramePacer.debugIndicator(mode, refreshHz, capHz, effectiveCapHz, locked, probing));
+    void theIndicatorNamesEveryPacingState(VSyncMode mode, int refreshHz, int capHz, int effectiveCapHz, FramePacer.PaceState state, String expected) {
+        assertEquals(expected, FramePacer.debugIndicator(mode, refreshHz, capHz, effectiveCapHz, state));
     }
 
-    @ParameterizedTest(name = "{0} refresh={1} cap={2}->{3} locked={4} probing={5}")
+    @ParameterizedTest(name = "{0} refresh={1} cap={2}->{3} state={4}")
     @CsvSource({
-        "ON, 60, 0, 0, true, false, 'Frame pacing: vsync 60Hz, hardware paced'",
-        "ON, 60, 0, 0, false, true, 'Frame pacing: vsync 60Hz, probing'",
-        "ON, 60, 0, 0, false, false, 'Frame pacing: vsync 60Hz, driver not blocking, paced by wall clock'",
-        "MAILBOX, 144, 0, 0, true, false, 'Frame pacing: mailbox 144Hz'",
-        "OFF, 144, 100, 100, false, false, 'Frame pacing: vsync off, cap 100'",
-        "ON, 60, 30, 30, true, false, 'Frame pacing: vsync 60Hz, hardware paced, cap 30'",
-        "ON, 144, 50, 48, true, false, 'Frame pacing: vsync 144Hz, hardware paced, cap 50 -> 48'",
+        "ON, 60, 0, 0, LOCKED, 'Frame pacing: vsync 60Hz, hardware paced'",
+        "ON, 60, 0, 0, PROBING, 'Frame pacing: vsync 60Hz, probing'",
+        "ON, 60, 0, 0, TIMER, 'Frame pacing: vsync 60Hz, paced by time'",
+        "ON, 60, 0, 0, TIMER_FALLBACK, 'Frame pacing: vsync 60Hz, driver is not holding frames to vblank, falling back to time pacing'",
+        "MAILBOX, 144, 0, 0, NONE, 'Frame pacing: mailbox 144Hz'",
+        "OFF, 144, 100, 100, NONE, 'Frame pacing: vsync off, cap 100'",
+        "ON, 60, 30, 30, LOCKED, 'Frame pacing: vsync 60Hz, hardware paced, cap 30'",
+        "ON, 144, 50, 48, LOCKED, 'Frame pacing: vsync 144Hz, hardware paced, cap 50 -> 48'",
     })
-    void thePacingLineNamesEveryPacingState(VSyncMode mode, int refreshHz, int capHz, int effectiveCapHz, boolean locked, boolean probing, String expected) {
-        assertEquals(expected, FramePacer.pacingLine(mode, refreshHz, capHz, effectiveCapHz, locked, probing));
+    void thePacingLineNamesEveryPacingState(VSyncMode mode, int refreshHz, int capHz, int effectiveCapHz, FramePacer.PaceState state, String expected) {
+        assertEquals(expected, FramePacer.pacingLine(mode, refreshHz, capHz, effectiveCapHz, state));
+    }
+
+    @ParameterizedTest(name = "{0} honored={1} locked={2} probing={3} -> {4}")
+    @CsvSource({
+        "ON, true, true, false, LOCKED",
+        "ON, true, false, true, PROBING",
+        "ON, true, false, false, TIMER_FALLBACK",
+        "ON, false, false, false, TIMER",
+        "MAILBOX, true, false, false, NONE",
+        "OFF, false, false, false, NONE",
+    })
+    void thePaceStateSeparatesADesignedTimerFromAFailedLock(VSyncMode mode, boolean honored, boolean locked, boolean probing, FramePacer.PaceState expected) {
+        assertEquals(expected, FramePacer.paceState(mode, honored, locked, probing));
     }
 
     @Test
@@ -158,6 +180,19 @@ class FramePacerTest {
             FramePacer.endFrame(60, null);
             assertTrue(FramePacer.pacedLastFrame(), "a nonzero cap must pace even under vsync off");
         });
+    }
+
+    @Test
+    void frameSlotIsAwaitedOnceBeforeTheGateSampleRegardlessOfVsync() {
+        for (VSyncMode mode : VSyncMode.values()) {
+            final FakeBackend backend = new FakeBackend();
+            backend.mode = mode;
+            withBackend(backend, () -> {
+                FramePacer.endFrame(0, null);
+                assertEquals(1, backend.awaitFrameSlotCalls, mode.name());
+                assertTrue(backend.slotAwaitedBeforeRead, mode.name());
+            });
+        }
     }
 
     @Test

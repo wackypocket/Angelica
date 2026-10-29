@@ -21,8 +21,10 @@ import static com.gtnewhorizons.angelica.glsm.backend.BackendManager.RENDER_BACK
 
 public final class VAOManager {
     public static final int MAX_ATTRIBS = 16;
+    private static final int DENSE_LIMIT = 1 << 16;
 
     public final Int2ObjectOpenHashMap<VAOData> vaoMap = new Int2ObjectOpenHashMap<>();
+    private VAOData[] dense = new VAOData[256];
 
     final Int2ObjectOpenHashMap<VAOData> eboOwners = new Int2ObjectOpenHashMap<>();
 
@@ -190,7 +192,7 @@ public final class VAOManager {
         final VAOData data = new VAOData();
         current = data;
         currentAttribs = data.attribs;
-        vaoMap.put(defaultVAO, data);
+        putVao(defaultVAO, data);
     }
 
     public boolean isInitialized() {
@@ -219,10 +221,10 @@ public final class VAOManager {
             current.arrayVersion = arrayVersion;
         }
 
-        VAOData data = vaoMap.get(vaoId);
+        VAOData data = vaoId >= 0 && vaoId < dense.length ? dense[vaoId] : vaoMap.get(vaoId);
         if (data == null) {
             data = new VAOData();
-            vaoMap.put(vaoId, data);
+            putVao(vaoId, data);
         }
         current = data;
         currentVertexFlags = data.vertexFlags;
@@ -236,9 +238,17 @@ public final class VAOManager {
         arrayVersion = data.arrayVersion;
     }
 
+    private void putVao(int vaoId, VAOData data) {
+        vaoMap.put(vaoId, data);
+        if (vaoId < 0 || vaoId >= DENSE_LIMIT) return;
+        if (vaoId >= dense.length) dense = Arrays.copyOf(dense, Math.min(DENSE_LIMIT, Math.max(vaoId + 1, dense.length * 2)));
+        dense[vaoId] = data;
+    }
+
     public void onDeleteVertexArray(int vaoId) {
         final VAOData data = vaoMap.remove(vaoId);
         if (data == null) return;
+        if (vaoId >= 0 && vaoId < dense.length) dense[vaoId] = null;
         removeEboOwner(data.ebo, data);
         if (data == current) current = null;
     }

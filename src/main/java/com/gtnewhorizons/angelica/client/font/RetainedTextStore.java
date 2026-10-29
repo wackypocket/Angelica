@@ -6,9 +6,14 @@ import com.gtnewhorizons.angelica.glsm.GLStateManager;
 import com.gtnewhorizons.angelica.glsm.backend.RenderBackend;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import org.lwjgl.opengl.GL15;
+import org.lwjgl.opengl.GL30;
 
 import java.nio.ByteBuffer;
 import java.util.Arrays;
+
+import static com.gtnewhorizons.angelica.glsm.backend.BackendManager.RENDER_BACKEND;
+import static com.gtnewhorizon.gtnhlib.bytebuf.MemoryUtilities.memAddress0;
+import static com.gtnewhorizon.gtnhlib.bytebuf.MemoryUtilities.memCopy;
 
 final class RetainedTextStore {
 
@@ -26,6 +31,8 @@ final class RetainedTextStore {
     private static int[] retiredBuffers = new int[4];
     private static long[] retiredBufferFrames = new long[4];
     private static int retiredBufferCount;
+
+    private static final int UNSYNCHRONIZED_WRITE = GL30.GL_MAP_WRITE_BIT | GL30.GL_MAP_UNSYNCHRONIZED_BIT | GL30.GL_MAP_INVALIDATE_RANGE_BIT;
 
     private RetainedTextStore() {}
 
@@ -124,8 +131,16 @@ final class RetainedTextStore {
         final ByteBuffer vertices = mesh.vertices;
         vertices.position(0);
         vertices.limit(mesh.quadCount * BatchingFontRenderer.QUAD_BYTES);
+        final long offset = (long) start * BatchingFontRenderer.QUAD_BYTES;
+        final int length = mesh.quadCount * BatchingFontRenderer.QUAD_BYTES;
         GLSMBuffers.glBindBuffer(GL15.GL_ARRAY_BUFFER, buffer);
-        GLSMBuffers.glBufferSubData(GL15.GL_ARRAY_BUFFER, (long) start * BatchingFontRenderer.QUAD_BYTES, vertices);
+        final ByteBuffer mapped = RENDER_BACKEND.supportsInPlaceMappedWrites() ? GLSMBuffers.glMapBufferRange(GL15.GL_ARRAY_BUFFER, offset, length, UNSYNCHRONIZED_WRITE) : null;
+        if (mapped != null) {
+            memCopy(mesh.address, memAddress0(mapped), length);
+            GLSMBuffers.glUnmapBuffer(GL15.GL_ARRAY_BUFFER);
+        } else {
+            GLSMBuffers.glBufferSubData(GL15.GL_ARRAY_BUFFER, offset, vertices);
+        }
         GLSMBuffers.glBindBuffer(GL15.GL_ARRAY_BUFFER, previous);
         vertices.clear();
     }

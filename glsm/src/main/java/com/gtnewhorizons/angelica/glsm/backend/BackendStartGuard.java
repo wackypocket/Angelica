@@ -24,37 +24,58 @@ public final class BackendStartGuard {
 
     private BackendStartGuard() {}
 
-    public static boolean begin(File dir, boolean sdlGpuConfigured, boolean flagForced, int requirementsRevision, String requestedDriver) {
+    public static boolean begin(File dir, boolean gpuBackendConfigured, boolean flagForced, int requirementsRevision, String requestedDriver) {
         marker = new File(dir, "sdlgpu-starting");
         verified = new File(dir, "sdlgpu-verified");
         key = requirementsRevision + "/" + requestedDriver;
         pending = tripped = false;
         if (flagForced) return false;
-        if (!sdlGpuConfigured) {
+        if (!gpuBackendConfigured) {
             delete(marker);
             return false;
         }
-        if (key.equals(read(verified))) return false;
-        final String count = read(marker);
-        final Integer parsed = count == null ? null : Ints.tryParse(count.trim());
-        strikes = parsed == null ? 0 : parsed;
+        if (isVerified()) return false;
+        strikes = readStrikes();
         if (strikes >= STRIKE_LIMIT) {
-            LOGGER.warn("SDL GPU failed to bring up the device {} times in a row; resetting the render backend to OpenGL", strikes);
+            LOGGER.warn("The GPU backend ({}) failed to bring up the device {} times in a row; resetting the render backend to OpenGL", key, strikes);
             delete(marker);
             tripped = true;
             return true;
         }
         if (strikes == STRIKE_LIMIT - 1) {
-            LOGGER.warn("SDL GPU failed to bring up the device {} times in a row; one more and the render backend switches to OpenGL", strikes);
+            LOGGER.warn("The GPU backend ({}) failed to bring up the device {} times in a row; one more and the render backend switches to OpenGL", key, strikes);
         } else if (strikes > 0) {
-            LOGGER.info("The last start ended while bringing up the SDL GPU device");
+            LOGGER.info("The last start ended while bringing up the GPU backend ({})", key);
         }
         pending = true;
         return false;
     }
 
     public static void arm() {
-        if (pending) write(marker, Integer.toString(strikes + 1));
+        if (pending) write(marker, (strikes + 1) + "\n" + key);
+    }
+
+    private static boolean isVerified() {
+        final String content = read(verified);
+        if (content == null) return false;
+        for (String line : content.split("\n")) {
+            if (key.equals(line.trim())) return true;
+        }
+        return false;
+    }
+
+    private static void recordVerified() {
+        final String content = read(verified);
+        write(verified, content == null || content.trim().isEmpty() ? key : content.trim() + "\n" + key);
+    }
+
+    private static int readStrikes() {
+        final String content = read(marker);
+        if (content == null) return 0;
+        final String[] parts = content.trim().split("\n", 2);
+        if (parts.length == 2 && !key.equals(parts[1].trim())) return 0;
+        final Integer parsed = Ints.tryParse(parts[0].trim());
+        return parsed == null ? 0 : parsed;
     }
 
     public static void disarm() {
@@ -64,8 +85,8 @@ public final class BackendStartGuard {
     public static void latch() {
         if (!pending) return;
         pending = false;
-        write(verified, key);
-        LOGGER.info("SDL GPU booted; the startup guard stays off until the requirements revision or driver changes");
+        recordVerified();
+        LOGGER.info("The GPU backend ({}) booted; the startup guard stays off until the requirements revision or driver changes", key);
     }
 
     public static boolean tripped() {

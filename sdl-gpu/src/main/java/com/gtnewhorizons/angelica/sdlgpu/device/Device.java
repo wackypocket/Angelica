@@ -408,7 +408,7 @@ public final class Device {
     }
 
     private static final List<VSyncMode> ON_ORDER = List.of(VSyncMode.ON);
-    private static final List<VSyncMode> OFF_ORDER = List.of(VSyncMode.OFF, VSyncMode.ON);
+    private static final List<VSyncMode> OFF_ORDER = List.of(VSyncMode.OFF, VSyncMode.MAILBOX, VSyncMode.ON);
     private static final List<VSyncMode> MAILBOX_ORDER = List.of(VSyncMode.MAILBOX, VSyncMode.ON);
 
     private static List<VSyncMode> presentModeOrder(VSyncMode preferred) {
@@ -453,7 +453,7 @@ public final class Device {
     }
 
     public boolean supportsVSyncMode(VSyncMode mode) {
-        return device != 0 && claimed && SDL_WindowSupportsGPUPresentMode(device, Display.getWindow(), toSdl(mode));
+        return mode != VSyncMode.FIFO_LATEST_READY && device != 0 && claimed && SDL_WindowSupportsGPUPresentMode(device, Display.getWindow(), toSdl(mode));
     }
 
     public long getClaimedWindow() {

@@ -153,6 +153,7 @@ public class SodiumGameOptionPages {
                         }, (opts) -> opts.fullScreen)
                         .build())
                 .add(frameRate.vsync())
+                .add(frameRate.presentMode())
                 .add(frameRate.maxFramerate())
                 .build());
 
@@ -683,6 +684,7 @@ public class SodiumGameOptionPages {
         final FrameRateOptions frameRate = FrameRateOptions.create(vanillaOpts, sodiumOpts);
         groups.add(OptionGroup.createBuilder()
                 .add(frameRate.vsync())
+                .add(frameRate.presentMode())
                 .add(frameRate.maxFramerate())
                 .build());
 

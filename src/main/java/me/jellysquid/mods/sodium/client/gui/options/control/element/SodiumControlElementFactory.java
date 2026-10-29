@@ -8,9 +8,11 @@ import me.jellysquid.mods.sodium.client.util.Dim2i;
 import net.minecraft.util.MathHelper;
 import org.lwjgl.input.Keyboard;
 
+import java.util.function.Supplier;
+
 public class SodiumControlElementFactory implements ControlElementFactory {
     @Override
-    public <T extends Enum<T>> ControlElement<T> cyclingControlElement(Option<T> option, Dim2i dim, T[] allowedValues, String[] names) {
+    public <T extends Enum<T>> ControlElement<T> cyclingControlElement(Option<T> option, Dim2i dim, Supplier<T[]> allowedValues, String[] names) {
         return new CyclingControlElement<>(option, dim, allowedValues, names);
     }
 
@@ -25,10 +27,10 @@ public class SodiumControlElementFactory implements ControlElementFactory {
     }
 
     private static class CyclingControlElement<T extends Enum<T>> extends SodiumControlElement<T> {
-        private final T[] allowedValues;
+        private final Supplier<T[]> allowedValues;
         private final String[] names;
 
-        public CyclingControlElement(Option<T> option, Dim2i dim, T[] allowedValues, String[] names) {
+        public CyclingControlElement(Option<T> option, Dim2i dim, Supplier<T[]> allowedValues, String[] names) {
             super(option, dim);
 
             this.allowedValues = allowedValues;
@@ -36,8 +38,9 @@ public class SodiumControlElementFactory implements ControlElementFactory {
         }
 
         private int currentIndex() {
-            for (int i = 0; i < this.allowedValues.length; i++) {
-                if (this.allowedValues[i] == this.option.getValue()) {
+            final T[] allowed = this.allowedValues.get();
+            for (int i = 0; i < allowed.length; i++) {
+                if (allowed[i] == this.option.getValue()) {
                     return i;
                 }
             }
@@ -48,7 +51,8 @@ public class SodiumControlElementFactory implements ControlElementFactory {
         public void render(int mouseX, int mouseY, float delta) {
             super.render(mouseX, mouseY, delta);
 
-            Enum<T> value = this.option.getValue();
+            final T[] allowed = this.allowedValues.get();
+            final Enum<T> value = allowed[this.currentIndex()];
             String name = this.formatValue(this.names[value.ordinal()]);
 
             int strWidth = this.getTextWidth(name);
@@ -58,7 +62,8 @@ public class SodiumControlElementFactory implements ControlElementFactory {
         @Override
         public boolean mouseClicked(double mouseX, double mouseY, int button) {
             if (this.option.isAvailable() && this.dim.containsCursor(mouseX, mouseY) && (button == 0 || button == 1)) {
-                this.option.setValue(this.allowedValues[Math.floorMod(this.currentIndex() + (button == 0 ? 1 : -1), this.allowedValues.length)]);
+                final T[] allowed = this.allowedValues.get();
+                this.option.setValue(allowed[Math.floorMod(this.currentIndex() + (button == 0 ? 1 : -1), allowed.length)]);
                 this.playClickSound();
 
                 return true;

@@ -114,7 +114,6 @@ public class ReeseSodiumVideoOptionsScreen extends ScrollableGuiScreen {
     public void rebuildGUI() {
         // Preserve search focus state across rebuilds
         boolean wasSearchFocused = this.searchTextField != null && this.searchTextField.isFocused();
-        this.children.clear();
         this.initGui();
         if (wasSearchFocused && this.searchTextField != null) {
             this.searchTextField.setFocused(true);
@@ -135,6 +134,7 @@ public class ReeseSodiumVideoOptionsScreen extends ScrollableGuiScreen {
     @Override
     public void initGui() {
         Keyboard.enableRepeatEvents(true);
+        this.children.clear();
         this.frame = this.parentFrameBuilder().build();
         this.children.add(this.frame);
 
@@ -260,6 +260,7 @@ public class ReeseSodiumVideoOptionsScreen extends ScrollableGuiScreen {
     }
 
     private void updateControls() {
+        this.getAllOptions().forEach(Option::syncIfUnchanged);
         final boolean hasChanges = this.getAllOptions().anyMatch(Option::hasChanged);
 
         this.applyButton.setEnabled(hasChanges);
