@@ -50,6 +50,7 @@ public final class ShaderDiskCache {
     private static volatile Path root;
     private static final AtomicBoolean writeWarned = new AtomicBoolean();
     private static final AtomicInteger TMP_SEQ = new AtomicInteger();
+    private static final String TMP_TAG = Long.toHexString(new java.security.SecureRandom().nextLong()); // keeps concurrent launches from sharing temp names
 
     private ShaderDiskCache() {}
 
@@ -128,7 +129,7 @@ public final class ShaderDiskCache {
         final Path r = root;
         if (r == null) return false;
         final Path target = key.path(r);
-        final Path tmp = target.resolveSibling(key.hex() + '.' + TMP_SEQ.getAndIncrement() + ".tmp");
+        final Path tmp = target.resolveSibling(key.hex() + '.' + TMP_TAG + '.' + TMP_SEQ.getAndIncrement() + ".tmp");
         try {
             try {
                 write(tmp, payload);
@@ -377,6 +378,14 @@ public final class ShaderDiskCache {
         public Key bytes(byte[] v) {
             i(v.length);
             md.update(v);
+            return this;
+        }
+
+        public Key ints(int[] v) {
+            i(v.length);
+            final ByteBuffer b = ByteBuffer.allocate(v.length * 4);
+            b.asIntBuffer().put(v);
+            md.update(b);
             return this;
         }
 

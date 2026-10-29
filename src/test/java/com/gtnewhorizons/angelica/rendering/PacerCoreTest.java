@@ -368,7 +368,7 @@ class PacerCoreTest {
     }
 
     @Test
-    void theProbeRunsAheadOfThePanelOnlyUntilItHasGainedTwoPeriods() {
+    void theProbeRunsAheadOfThePanelOnlyUntilItHasGainedSixPeriods() {
         final Rig rig = new Rig(P60, true, 0);
         for (int i = 0; i < 400; i++) rig.frame(4 * MS);
         final long lead = P60 / PacerCore.PROBE_LEAD_DIVISOR;
@@ -380,7 +380,8 @@ class PacerCoreTest {
     @Test
     void anExpiredProbeLeadStillLocksWhenTheGateArrives() {
         final Rig rig = new Rig(P60, true, 0);
-        for (int i = 0; i < 20; i++) rig.frame(4 * MS);
+        final int probeFrames = PacerCore.PROBE_LEAD_PERIODS * PacerCore.PROBE_LEAD_DIVISOR + 4;
+        for (int i = 0; i < probeFrames; i++) rig.frame(4 * MS);
         assertFalse(rig.core.locked());
         assertFalse(rig.core.probing());
 

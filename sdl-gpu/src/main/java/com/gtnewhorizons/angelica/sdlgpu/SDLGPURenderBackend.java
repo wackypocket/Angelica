@@ -98,6 +98,7 @@ import java.nio.FloatBuffer;
 import java.nio.IntBuffer;
 import java.nio.ShortBuffer;
 import java.nio.charset.StandardCharsets;
+import java.util.function.BooleanSupplier;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -114,6 +115,7 @@ import java.util.function.BiConsumer;
 import org.lwjgl.sdl.SDLGPU;
 import org.lwjgl.sdl.SDL_GPUBlitInfo;
 import org.lwjgl.sdl.SDLTimer;
+import org.lwjgl.sdl.SDLVideo;
 import org.lwjgl.sdl.SDL_GPUBufferLocation;
 import org.lwjgl.sdl.SDL_GPUTextureLocation;
 import org.lwjgl.system.MemoryStack;
@@ -278,6 +280,9 @@ public class SDLGPURenderBackend extends RenderBackend {
     }
 
     @Override public void init() {
+        MainThreadExec.runOnMainThread(() -> {
+            org.lwjgl.sdl.SDLHints.SDL_SetHint(org.lwjgl.sdl.SDLHints.SDL_HINT_VIDEO_MAC_FULLSCREEN_MENU_VISIBILITY, "1");
+        });
         final boolean lwjglDebugFlag = GLStateManager.getInitConfig() != null && GLStateManager.getInitConfig().isLwjglDebug();
         final boolean enableMarkers = lwjglDebugFlag || CaptureGate.enabledAtStartup();
         debugLabels = new DebugLabels(frameManager, enableMarkers);
@@ -487,6 +492,47 @@ public class SDLGPURenderBackend extends RenderBackend {
     }
 
     @Override public void pumpDisplayMessages() { Pump.INSTANCE.pumpMessages(); }
+
+    private final int[] windowedBounds = new int[4];
+    private boolean hasWindowedBounds;
+
+    @Override public void saveWindowedBounds() {
+        final long window = Display.getWindow();
+        if (window == 0L) return;
+        MainThreadExec.runOnMainThread(() -> {
+            if ((SDLVideo.SDL_GetWindowFlags(window) & SDLVideo.SDL_WINDOW_FULLSCREEN) != 0L) return;
+            try (MemoryStack stack = MemoryStack.stackPush()) {
+                final IntBuffer x = stack.mallocInt(1), y = stack.mallocInt(1), w = stack.mallocInt(1), h = stack.mallocInt(1);
+                SDLVideo.SDL_GetWindowPosition(window, x, y);
+                SDLVideo.SDL_GetWindowSize(window, w, h);
+                windowedBounds[0] = x.get(0);
+                windowedBounds[1] = y.get(0);
+                windowedBounds[2] = w.get(0);
+                windowedBounds[3] = h.get(0);
+                hasWindowedBounds = w.get(0) > 1 && h.get(0) > 1;
+            }
+        });
+    }
+
+    @Override public void restoreWindowedBounds() {
+        final long window = Display.getWindow();
+        if (window == 0L || !hasWindowedBounds) return;
+        MainThreadExec.runOnMainThread(() -> {
+            SDLVideo.SDL_RestoreWindow(window);
+            SDLVideo.SDL_SetWindowSize(window, windowedBounds[2], windowedBounds[3]);
+            SDLVideo.SDL_SetWindowPosition(window, windowedBounds[0], windowedBounds[1]);
+            SDLVideo.SDL_SyncWindow(window);
+        });
+    }
+
+    @Override public boolean tracksWindowFullscreen() { return true; }
+
+    @Override public boolean isWindowFullscreen() {
+        final long window = Display.getWindow();
+        if (window == 0L) return false;
+        return MainThreadExec.runOnMainThread((BooleanSupplier) () ->
+            (SDLVideo.SDL_GetWindowFlags(window) & SDLVideo.SDL_WINDOW_FULLSCREEN) != 0L);
+    }
 
     @Override public void shutdown() {
         if (shutdown) return;

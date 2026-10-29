@@ -404,7 +404,7 @@ class PacerCoreSimTest {
     void anHonoredVsyncGateIsLeftToPaceItself() {
         for (final long drift : new long[] { 0L, 1000L }) {
             for (final long work : new long[] { 4 * MS, 10 * MS }) {
-                for (final int queue : new int[] { 1, 2 }) {
+                for (final int queue : new int[] { 1, 2, 3, 4 }) {
                     for (final Gate gate : new Gate[] { Gate.SWAP, Gate.FIRST_CLEAR }) {
                         final Sim sim = fifo60(work, queue, gate)
                             .named("fifo60 R=" + work / MS + "ms Q=" + queue + " " + gate + " drift=" + drift);

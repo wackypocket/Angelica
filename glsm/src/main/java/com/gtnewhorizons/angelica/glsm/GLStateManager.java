@@ -681,6 +681,22 @@ public class GLStateManager {
         RENDER_BACKEND.pumpDisplayMessages();
     }
 
+    public static boolean tracksWindowFullscreen() {
+        return RENDER_BACKEND.tracksWindowFullscreen();
+    }
+
+    public static boolean isWindowFullscreen() {
+        return RENDER_BACKEND.isWindowFullscreen();
+    }
+
+    public static void saveWindowedBounds() {
+        RENDER_BACKEND.saveWindowedBounds();
+    }
+
+    public static void restoreWindowedBounds() {
+        RENDER_BACKEND.restoreWindowedBounds();
+    }
+
     public static boolean vendorIsAMD() {
         return VENDOR == AMD;
     }

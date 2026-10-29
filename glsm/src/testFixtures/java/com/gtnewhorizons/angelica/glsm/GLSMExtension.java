@@ -1,6 +1,5 @@
 package com.gtnewhorizons.angelica.glsm;
 
-import com.gtnewhorizons.angelica.config.SystemProperties;
 import com.gtnewhorizons.angelica.glsm.ffp.ShaderManager;
 import com.gtnewhorizons.angelica.glsm.hooks.GLSMInitConfig;
 import org.junit.jupiter.api.extension.AfterEachCallback;
@@ -80,7 +79,9 @@ public class GLSMExtension implements BeforeAllCallback, BeforeEachCallback, Aft
             Display.setDisplayModeAndFullscreen(displayMode);
             Display.setResizable(false);
             Display.setFullscreen(false);
-            Display.create(new PixelFormat().withDepthBits(24).withStencilBits(8));
+            Display.create(
+                new PixelFormat().withDepthBits(24).withStencilBits(8),
+                new ContextAttribs(3, 3).withProfileCompatibility(true));
 
             GLStateManager.initialize(config);
             GLStateManager.setRunningSplash(false);

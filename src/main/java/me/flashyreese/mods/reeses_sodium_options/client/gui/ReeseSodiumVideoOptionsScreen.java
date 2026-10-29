@@ -114,7 +114,6 @@ public class ReeseSodiumVideoOptionsScreen extends ScrollableGuiScreen {
     public void rebuildGUI() {
         // Preserve search focus state across rebuilds
         boolean wasSearchFocused = this.searchTextField != null && this.searchTextField.isFocused();
-        this.children.clear();
         this.initGui();
         if (wasSearchFocused && this.searchTextField != null) {
             this.searchTextField.setFocused(true);
@@ -135,8 +134,10 @@ public class ReeseSodiumVideoOptionsScreen extends ScrollableGuiScreen {
     @Override
     public void initGui() {
         Keyboard.enableRepeatEvents(true);
+        this.children.clear();
         this.frame = this.parentFrameBuilder().build();
         this.children.add(this.frame);
+        this.builtVisibility = visibilitySignature();
 
         this.searchTextField.setFocused(!lastSearch.get().trim().isEmpty());
         if (this.searchTextField.isFocused()) {
@@ -207,7 +208,7 @@ public class ReeseSodiumVideoOptionsScreen extends ScrollableGuiScreen {
     }
 
     public BasicFrame.Builder parentBasicFrameBuilder(Dim2i parentBasicFrameDim, Dim2i tabFrameDim) {
-        final Predicate<Option<?>> optionPredicate = searchTextField.getOptionPredicate();
+        final Predicate<Option<?>> optionPredicate = optionFilter();
         final boolean noResults = searchTextField.hasNoResults();
 
         BasicFrame.Builder builder = BasicFrame.createBuilder()
@@ -260,6 +261,8 @@ public class ReeseSodiumVideoOptionsScreen extends ScrollableGuiScreen {
     }
 
     private void updateControls() {
+        this.getAllOptions().forEach(Option::syncIfUnchanged);
+        if (visibilitySignature() != this.builtVisibility) this.rebuildGUI();
         final boolean hasChanges = this.getAllOptions().anyMatch(Option::hasChanged);
 
         this.applyButton.setEnabled(hasChanges);
@@ -305,6 +308,19 @@ public class ReeseSodiumVideoOptionsScreen extends ScrollableGuiScreen {
         this.getAllOptions().forEach(Option::reset);
     }
 
+    private Predicate<Option<?>> optionFilter() {
+        return searchTextField.getOptionPredicate().and(Option::isVisible);
+    }
+
+    // Options whose visibility depends on another option's pending value (the backend selectors) need the page rebuilt when it flips.
+    private long builtVisibility;
+
+    private long visibilitySignature() {
+        long sig = 1L;
+        for (Option<?> option : (Iterable<Option<?>>) this.getAllOptions()::iterator) sig = sig * 31L + (option.isVisible() ? 1L : 0L);
+        return sig;
+    }
+
     /**
      * Check if a page has any options that match the current search filter.
      */
@@ -313,7 +329,7 @@ public class ReeseSodiumVideoOptionsScreen extends ScrollableGuiScreen {
             return false;
         }
 
-        Predicate<Option<?>> predicate = searchTextField.getOptionPredicate();
+        Predicate<Option<?>> predicate = optionFilter();
         for (OptionGroup group : page.getGroups()) {
             for (Option<?> option : group.getOptions()) {
                 if (predicate.test(option)) {

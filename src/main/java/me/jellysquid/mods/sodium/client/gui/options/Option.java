@@ -20,9 +20,14 @@ public interface Option<T> {
 
     void reset();
 
+    default void syncIfUnchanged() {}
+
     OptionStorage<?> getStorage();
 
     boolean isAvailable();
+
+    /** Whether the option is shown at all; a hidden option still holds and applies its value. */
+    default boolean isVisible() { return true; }
 
     boolean hasChanged();
 

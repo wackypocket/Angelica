@@ -356,6 +356,7 @@ val spirvTest by tasks.registering(Test::class) {
         includeTestsMatching("com.gtnewhorizons.angelica.glsm.shader.SpirvShaderTranslator*Test")
         includeTestsMatching("com.gtnewhorizons.angelica.glsm.ffp.FFPUniformBlockSpirvLayoutTest")
         includeTestsMatching("com.gtnewhorizons.angelica.glsm.shader.SpirvCompilerDiskCacheTest")
+        includeTestsMatching("com.gtnewhorizons.angelica.glsm.shader.DerivativeHoistingTest")
     }
 
     // libshaderc.so / libspirv-cross.so are extracted by extractNatives3.

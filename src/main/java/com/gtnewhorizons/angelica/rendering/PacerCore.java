@@ -16,7 +16,7 @@ final class PacerCore {
     private static final long IDLE_MIN_BUDGET_NANOS = 500_000L;
     private static final long PRESENT_SLOP_NANOS = 50_000L;
 
-    private static final int PROBE_LEAD_PERIODS = 2;
+    static final int PROBE_LEAD_PERIODS = 6;
     static final int PROBE_LEAD_DIVISOR = 8;
     static final int LOCK_PAIRS = 3;
     static final int LOCK_FRAMES = 600;
@@ -180,7 +180,7 @@ final class PacerCore {
             return now;
         }
 
-        probing = vsyncOn && !locked && !probeExhausted && c == refreshPeriodNanos;
+        probing = vsyncOn && fifo && !locked && !probeExhausted && c == refreshPeriodNanos;
         final long step = probing ? c - c / PROBE_LEAD_DIVISOR : c;
         if (probing) {
             probeLeadNanos += c - step;
@@ -271,6 +271,10 @@ final class PacerCore {
 
     boolean locked() {
         return locked;
+    }
+
+    boolean expectsDriverPacing() {
+        return vsyncOn && fifo && cadenceNanos > 0L && cadenceNanos == refreshPeriodNanos;
     }
 
     boolean probing() {

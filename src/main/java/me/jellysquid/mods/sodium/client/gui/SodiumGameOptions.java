@@ -125,6 +125,7 @@ public class SodiumGameOptions {
         if (Files.exists(path)) {
             try (FileReader reader = new FileReader(path.toFile())) {
                 config = GSON.fromJson(reader, SodiumGameOptions.class);
+                if (config != null) config.advanced.migrateLegacyFields();
             } catch (IOException e) {
                 throw new RuntimeException("Could not parse config", e);
             } catch (JsonSyntaxException e) {
@@ -209,9 +210,15 @@ public class SodiumGameOptions {
     }
 
     public static class AdvancedSettings {
-        public VSyncMode vsyncMode;
+        public VSyncMode presentMode;
+        @Deprecated public VSyncMode vsyncMode; // the pre-present-mode name, read once and dropped
         public boolean useVertexArrayObjects = true;
         public MultiDrawMode multiDrawMode = MultiDrawMode.DIRECT;
+
+        void migrateLegacyFields() {
+            if (presentMode == null && vsyncMode != null && vsyncMode.tearFree()) presentMode = vsyncMode;
+            vsyncMode = null;
+        }
 
         public boolean useParticleCulling = true;
         public boolean allowDirectMemoryAccess = true;

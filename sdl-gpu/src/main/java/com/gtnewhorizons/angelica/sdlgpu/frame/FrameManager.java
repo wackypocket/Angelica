@@ -1066,7 +1066,7 @@ public final class FrameManager {
             final long info = stack.ncalloc(SDL_GPUBlitInfo.ALIGNOF, 1, SDL_GPUBlitInfo.SIZEOF);
             writeBlitRegion(info + SDL_GPUBlitInfo.SOURCE, srcTexture, srcW, srcH);
             writeBlitRegion(info + SDL_GPUBlitInfo.DESTINATION, tex, w, h);
-            MemoryAccess.putInt(info + SDL_GPUBlitInfo.FILTER, SDL_GPU_FILTER_LINEAR);
+            MemoryAccess.putInt(info + SDL_GPUBlitInfo.FILTER, srcW == w && srcH == h ? SDL_GPU_FILTER_NEAREST : SDL_GPU_FILTER_LINEAR);
             MemoryAccess.putInt(info + SDL_GPUBlitInfo.FLIP_MODE, flipMode);
             nSDL_BlitGPUTexture(cb, info);
         }

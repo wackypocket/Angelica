@@ -11,7 +11,7 @@
 * Shaders - Iris backport & enhancements
 * Terrain - Celeritas 2.5.12 with threaded chunk building and translucency sorting
 * GL 3.3 core profile with Java based fixed function pipeline emulation
-* Renderer selection - OpenGL, or SDL GPU for Vulkan/Metal/Direct3D 12
+* Renderer selection - OpenGL, SDL GPU, or Native Vulkan/Metal/Direct3D 12
 * Batching and instancing for entities, tile entities, items, particles and weather
 * Dynamic lights
 * HUD caching
@@ -25,6 +25,7 @@
    * Complementary + Euphoria Patches is the primary compatibility target
    * Sildurs, Seus, and any other shaders might work
 * SDL GPU renderer - Experimental
+* Native renderer - Experimental
 * MCPatcher features - Alpha
 * HUD caching - Semi-stable
 
@@ -33,7 +34,13 @@ Optional, OpenGL is the default
 * Vulkan, Metal (macOS) and Direct3D 12 (Windows) through SDL3
 * Needs [LWJGL3ify](https://github.com/GTNewHorizons/lwjgl3ify/releases/) 3.0.25+
 * Falls back to OpenGL when no device can be created
-* Vulkan on macOS via MoltenVK from the optional `angelica-moltenvk` jar
+* Vulkan on macOS via MoltenVK, included in the Angelica jar
+
+## Native renderer
+Optional, OpenGL is the default
+* Angelica's own renderer on Vulkan, Metal (macOS) or Direct3D 12 (Windows), without SDL in between
+* Needs [LWJGL3ify](https://github.com/GTNewHorizons/lwjgl3ify/releases/), same as SDL GPU
+* Falls back to OpenGL when no device can be created
 
 ## Core Profile
 Targets GL 3.3+ core profile
@@ -129,5 +136,7 @@ Targets GL 3.3+ core profile
   * FFP vertex shader generation inspired by ffvertex_prog.c (Copyright 2007 VMware, Inc.)
   * FFP fragment shader generation inspired by ff_fragment_shader.c (Copyright 2007, 2009 VMware, Inc. / 2010-2011 Intel Corporation)
   * Fog parameter optimization inspired by st_nir_lower_fog.c (Copyright 2023 Google LLC) and prog_statevars.c (Copyright 1999-2007 Brian Paul)
+* [MoltenVK](https://github.com/KhronosGroup/MoltenVK)
+  * The Khronos Group's Vulkan-on-Metal layer, included in the Angelica jar, under the Apache 2.0 license
 * RGSS Terrain Texture Filtering
   * Indiesoft for [defold-sharp-sprite](https://github.com/indiesoftby/defold-sharp-sprite), used as the reference implementation under the MIT license

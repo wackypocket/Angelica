@@ -1,8 +1,6 @@
-package com.gtnewhorizons.angelica.sdlgpu.shader;
+package com.gtnewhorizons.angelica.glsm.shader;
 
-import com.gtnewhorizons.angelica.glsm.shader.GlslVulkanPreprocess;
 import com.gtnewhorizons.angelica.glsm.shader.GlslVulkanPreprocess.Edit;
-import com.gtnewhorizons.angelica.glsm.shader.ShaderIndex;
 import org.antlr.v4.runtime.ParserRuleContext;
 import org.antlr.v4.runtime.Token;
 import org.antlr.v4.runtime.tree.ParseTree;
@@ -28,6 +26,11 @@ import static com.gtnewhorizons.angelica.glsm.shader.GlslVulkanPreprocess.stopId
  * leaves undefined. ACO writes {@code src - src[lane0]} in the active lanes only, then reads lane 1/2 with
  * fetch-inactive, so a neighbor that skipped the branch hands back a stale register, often NaN!
  * This was observed on Euphoria Patches and this aims to fix this wherever possible on Vulkan.
+ * <p>
+ * A call moves only when its operand is a plain variable (optionally swizzled) of a scalar or vector float type, and
+ * only to the outermost enclosing {@code if} inside which that variable is neither declared nor written, counting
+ * writes through {@code out}/{@code inout} parameters and, for globals, through any called function. Loops, switches
+ * and function boundaries are never crossed, and a shader with conditional directives or macros is left alone.
  */
 public final class DerivativeHoisting {
 

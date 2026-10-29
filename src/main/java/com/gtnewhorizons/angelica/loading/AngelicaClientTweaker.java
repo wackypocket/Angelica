@@ -17,7 +17,10 @@ import com.gtnewhorizons.angelica.glsm.loading.Lwjgl3ifyExclusions;
 import com.gtnewhorizons.angelica.glsm.profiling.TracyOptions;
 import com.gtnewhorizons.angelica.loading.fml.compat.CompatHandlers;
 import com.gtnewhorizons.angelica.lwjgl3.MissingDependencySdl;
+import com.gtnewhorizons.angelica.d3d12.D3d12Gate;
+import com.gtnewhorizons.angelica.metal.MetalGate;
 import com.gtnewhorizons.angelica.sdlgpu.SDLGPUGate;
+import com.gtnewhorizons.angelica.vulkan.VulkanGate;
 import com.gtnewhorizons.angelica.mixins.Mixins;
 import cpw.mods.fml.relauncher.FMLLaunchHandler;
 import cpw.mods.fml.relauncher.FMLRelaunchLog;
@@ -73,11 +76,22 @@ public final class AngelicaClientTweaker implements IFMLLoadingPlugin, IEarlyMix
             // Angelica Config
             ConfigurationManager.registerConfig(AngelicaConfig.class);
             TracyOptions.latch(AngelicaConfig.enableTracy, AngelicaConfig.tracyAllowRemote, AngelicaConfig.tracyFineZones, AngelicaConfig.tracyMaxSrcLocs);
-            if (BackendStartGuard.begin(new File(Launch.minecraftHome, "angelica"), AngelicaConfig.sdlGpuConfigured(), SystemProperties.SDL_GPU_OVERRIDE != null, SDLGPUGate.REQUIREMENTS_REVISION, BackendOptions.sdlGpuDriver(AngelicaConfig.sdlGpuDriverName()))) {
+            if (!AngelicaConfig.renderBackend.isSelectable()) {
+                LOGGER.warn("Render backend {} needs -Dangelica.experimentalBackends=true; running on OpenGL", AngelicaConfig.renderBackend);
+                AngelicaConfig.renderBackend = RenderBackendChoice.OPENGL;
+            }
+            final boolean nativeBackend = AngelicaConfig.nativeConfigured();
+            final boolean metal = nativeBackend && BackendOptions.DRIVER_METAL.equals(BackendOptions.nativeDriver(AngelicaConfig.nativeDriverName()));
+            final boolean d3d12 = nativeBackend && BackendOptions.DRIVER_D3D12.equals(BackendOptions.nativeDriver(AngelicaConfig.nativeDriverName()));
+            // The start guard is keyed by the chosen backend's requirements revision and driver, so changing either starts a fresh strike count.
+            final int guardRevision = nativeBackend ? (d3d12 ? D3d12Gate.REQUIREMENTS_REVISION : metal ? MetalGate.REQUIREMENTS_REVISION : VulkanGate.REQUIREMENTS_REVISION) : SDLGPUGate.REQUIREMENTS_REVISION;
+            final String guardKey = nativeBackend ? (d3d12 ? D3d12Gate.GUARD_KEY : metal ? MetalGate.GUARD_KEY : VulkanGate.GUARD_KEY) : BackendOptions.sdlGpuDriver(AngelicaConfig.sdlGpuDriverName());
+            if (BackendStartGuard.begin(new File(Launch.minecraftHome, "angelica"), AngelicaConfig.sdlGpuConfigured() || nativeBackend,
+                SystemProperties.SDL_GPU_OVERRIDE != null || BackendOptions.nativeOverride() != null, guardRevision, guardKey)) {
                 AngelicaConfig.renderBackend = RenderBackendChoice.OPENGL;
                 ConfigurationManager.save(AngelicaConfig.class);
             }
-            BackendOptions.latch(AngelicaConfig.sdlGpuConfigured(), AngelicaConfig.sdlGpuDriverName(), AngelicaConfig.glVersion);
+            BackendOptions.latch(AngelicaConfig.sdlGpuConfigured(), AngelicaConfig.nativeConfigured(), AngelicaConfig.sdlGpuDriverName(), AngelicaConfig.nativeDriverName(), AngelicaConfig.glVersion);
             ConfigurationManager.registerConfig(CompatConfig.class);
             ConfigurationManager.registerConfig(FontConfig.class);
             MCPatcherForgeConfig.registerConfig();
@@ -99,6 +113,27 @@ public final class AngelicaClientTweaker implements IFMLLoadingPlugin, IEarlyMix
             DependencyVerifier.gtnhLibChecks("Angelica"), LOGGER,
             (title, message) -> MissingDependencySdl.showFatal(title, message));
 
+        if (VulkanGate.isRequested()) {
+            if (VulkanGate.isVulkanAvailable()) {
+                LOGGER.info("Native renderer requested on Vulkan");
+            } else {
+                LOGGER.warn("Native renderer unavailable on Vulkan, running on OpenGL: {}", VulkanGate.missingRequirement());
+            }
+        }
+        if (MetalGate.isRequested()) {
+            if (MetalGate.isMetalAvailable()) {
+                LOGGER.info("Native renderer requested on Metal");
+            } else {
+                LOGGER.warn("Native renderer unavailable on Metal, running on OpenGL: {}", MetalGate.missingRequirement());
+            }
+        }
+        if (D3d12Gate.isRequested()) {
+            if (D3d12Gate.isD3d12Available()) {
+                LOGGER.info("Native renderer requested on Direct3D 12");
+            } else {
+                LOGGER.warn("Native renderer unavailable on Direct3D 12, running on OpenGL: {}", D3d12Gate.missingRequirement());
+            }
+        }
         if (BackendOptions.sdlGpuRequested()) {
             if (SDLGPUGate.isSDLGPUAvailable()) {
                 LOGGER.info("SDL GPU window mode enabled");

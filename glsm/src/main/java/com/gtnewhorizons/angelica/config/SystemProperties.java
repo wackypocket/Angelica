@@ -18,6 +18,7 @@ public final class SystemProperties {
     // Backend selection
     public static final String KEY_USE_SDL_GPU = "angelica.sdlgpu.enable";
     public static final Boolean SDL_GPU_OVERRIDE = parseBooleanOverride(KEY_USE_SDL_GPU);
+    public static final boolean EXPERIMENTAL_BACKENDS = Boolean.getBoolean("angelica.experimentalBackends");
     public static final String GL_PROFILE = System.getProperty("angelica.glProfile", "");
     public static final boolean DISABLE_NVIDIA_WORKAROUND = Boolean.getBoolean("angelica.disableNvidiaWorkaround");
     public static final boolean DISABLE_LTW_WORKAROUND = Boolean.getBoolean("angelica.disableLtwWorkaround");
@@ -39,6 +40,43 @@ public final class SystemProperties {
     public static final int SDL_FRAMES_IN_FLIGHT = Integer.getInteger("angelica.sdlgpu.framesInFlight", 2);
     public static final boolean DISABLE_SDL_PRESENTER_THREAD = Boolean.getBoolean("angelica.sdlgpu.disablePresenterThread");
     public static final boolean SDL_DISABLE_IN_PASS_CLEAR = Boolean.getBoolean("angelica.sdlgpu.disableInPassClear");
+
+    // Vulkan
+    public static final String KEY_USE_VULKAN = "angelica.vulkan";
+    public static final Boolean VULKAN_OVERRIDE = parseBooleanOverride(KEY_USE_VULKAN);
+    public static final boolean VULKAN_STATS = Boolean.getBoolean("angelica.vulkan.stats");
+    public static final boolean VULKAN_DEBUG = Boolean.getBoolean("angelica.vulkan.debug");
+    public static final boolean VULKAN_NO_PRESENT_WAIT = Boolean.getBoolean("angelica.vulkan.noPresentWait");
+    public static final int VULKAN_PRESENT_WAIT_DEPTH = Math.max(1, Math.min(3, Integer.getInteger("angelica.vulkan.presentWaitDepth", 2)));
+    public static final boolean VULKAN_FORCE_IMMEDIATE = Boolean.getBoolean("angelica.vulkan.forceImmediate");
+    public static final boolean VULKAN_NO_PUSH_CONSTANTS = Boolean.getBoolean("angelica.vulkan.noPushConstants");
+    // Native backends let an upload into a resource this frame has only read ride the pre-frame upload command buffer,
+    // so draws recorded earlier in the frame already see it (as the SDL GPU transfer thread does); off restores GL order.
+    public static final boolean NATIVE_EARLY_UPLOADS = !"false".equals(System.getProperty("angelica.native.earlyUploads"));
+    public static final boolean VULKAN_PRESENT_QUEUE = !"false".equals(System.getProperty("angelica.vulkan.presentQueue"));
+    public static final boolean VULKAN_DEFER_PASSES = !"false".equals(System.getProperty("angelica.vulkan.deferPasses"));
+    public static final int VULKAN_FRAMES_IN_FLIGHT = Math.max(1, Math.min(3, Integer.getInteger("angelica.vulkan.framesInFlight", 2)));
+    public static final String VULKAN_DEVICE = System.getProperty("angelica.vulkan.device", "").trim();
+    public static final long VULKAN_DUMP_FRAME = Long.getLong("angelica.vulkan.dumpFrame", -1L);
+    public static final boolean VULKAN_DUMP_REPEAT = Boolean.getBoolean("angelica.vulkan.dumpRepeat");
+    public static final boolean MOLTENVK_ASYNC_SUBMIT = !"false".equals(System.getProperty("angelica.moltenvk.asyncSubmit"));
+    public static final boolean MOLTENVK_ARGUMENT_BUFFERS = Boolean.getBoolean("angelica.moltenvk.argumentBuffers");
+
+    // Metal
+    public static final String KEY_USE_METAL = "angelica.metal";
+    public static final Boolean METAL_OVERRIDE = parseBooleanOverride(KEY_USE_METAL);
+    public static final boolean METAL_STATS = Boolean.getBoolean("angelica.metal.stats");
+    public static final boolean METAL_DEBUG = Boolean.getBoolean("angelica.metal.debug");
+    public static final int METAL_FRAMES_IN_FLIGHT = Math.max(1, Math.min(3, Integer.getInteger("angelica.metal.framesInFlight", 2)));
+    public static final long METAL_DUMP_FRAME = Long.getLong("angelica.metal.dumpFrame", -1L);
+
+    // Direct3D 12
+    public static final String KEY_USE_D3D12 = "angelica.d3d12";
+    public static final Boolean D3D12_OVERRIDE = parseBooleanOverride(KEY_USE_D3D12);
+    public static final boolean D3D12_STATS = Boolean.getBoolean("angelica.d3d12.stats");
+    public static final boolean D3D12_DEBUG = Boolean.getBoolean("angelica.d3d12.debug");
+    public static final int D3D12_FRAMES_IN_FLIGHT = Math.max(1, Math.min(3, Integer.getInteger("angelica.d3d12.framesInFlight", 2)));
+    public static final long D3D12_DUMP_FRAME = Long.getLong("angelica.d3d12.dumpFrame", -1L);
 
     // Tracy
     public static final Boolean TRACY_OVERRIDE = parseBooleanOverride("angelica.tracy");

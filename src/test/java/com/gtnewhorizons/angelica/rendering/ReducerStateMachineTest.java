@@ -124,14 +124,15 @@ class ReducerStateMachineTest {
     @ParameterizedTest(name = "{0}: mergeCap({1}, {2}, {3}, {4}) -> {5}")
     @CsvSource({
         "unlimited user and no state cap is uncapped, 0, 0, false, true, 0",
-        "unlimited user and no state cap is uncapped, 260, 0, false, true, 0",
+        "unlimited user and no state cap is uncapped, 401, 0, false, true, 0",
+        "the highest setting below unlimited is still a cap, 400, 0, false, true, 400",
         "the lower of the user and state cap wins, 120, 10, false, true, 10",
         "the lower of the user and state cap wins, 30, 60, false, true, 30",
         "menu cap applies only when the option is on, 0, 0, true, true, 30",
         "menu cap applies only when the option is on, 0, 0, true, false, 0",
         "menu cap never raises the user cap, 20, 0, true, true, 20",
-        "menu cap never raises the user cap, 260, 0, true, true, 30",
-        "menu cap never raises the user cap, 260, 10, true, true, 10",
+        "menu cap never raises the user cap, 401, 0, true, true, 30",
+        "menu cap never raises the user cap, 401, 10, true, true, 10",
     })
     void mergeCap(String name, int userCap, int stateCap, boolean inMenu, boolean menuCapOption, int expected) {
         assertEquals(expected, ReducerStateMachine.mergeCap(userCap, stateCap, inMenu, menuCapOption));
@@ -157,13 +158,13 @@ class ReducerStateMachineTest {
         assertEquals(10, ReducerStateMachine.stateCap(State.FORCED, 10, 30));
         assertEquals(10, ReducerStateMachine.stateCap(State.UNFOCUSED, 10, 30));
         assertEquals(20, ReducerStateMachine.stateCap(State.MINIMIZED, 5, 5));
-        assertEquals(20, ReducerStateMachine.stateCap(State.MINIMIZED, 260, 260));
+        assertEquals(20, ReducerStateMachine.stateCap(State.MINIMIZED, 401, 401));
         assertEquals(30, ReducerStateMachine.stateCap(State.IDLE, 10, 30));
         assertEquals(0, ReducerStateMachine.stateCap(State.FOCUSED, 10, 10));
         assertEquals(0, ReducerStateMachine.stateCap(State.DISABLED, 10, 10));
-        assertEquals(0, ReducerStateMachine.stateCap(State.UNFOCUSED, 260, 30));
-        assertEquals(0, ReducerStateMachine.stateCap(State.IDLE, 10, 260));
-        assertEquals(120, ReducerStateMachine.mergeCap(120, ReducerStateMachine.stateCap(State.UNFOCUSED, 260, 30), false, true));
+        assertEquals(0, ReducerStateMachine.stateCap(State.UNFOCUSED, 401, 30));
+        assertEquals(0, ReducerStateMachine.stateCap(State.IDLE, 10, 401));
+        assertEquals(120, ReducerStateMachine.mergeCap(120, ReducerStateMachine.stateCap(State.UNFOCUSED, 401, 30), false, true));
     }
 
     @Test

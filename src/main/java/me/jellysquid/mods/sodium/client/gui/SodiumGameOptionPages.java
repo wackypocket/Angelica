@@ -22,6 +22,7 @@ import com.gtnewhorizons.angelica.rendering.celeritas.MultiDrawModeResolver;
 import com.gtnewhorizons.angelica.rendering.culling.GpuCulling;
 import com.gtnewhorizons.angelica.config.GpuCullingMode;
 import com.gtnewhorizons.angelica.glsm.GLStateManager;
+import com.gtnewhorizons.angelica.glsm.backend.BackendManager;
 import cpw.mods.fml.common.Optional.Method;
 import com.gtnewhorizons.angelica.glsm.streaming.StreamingUploader;
 import jss.notfine.config.NotFineConfig;
@@ -153,6 +154,7 @@ public class SodiumGameOptionPages {
                         }, (opts) -> opts.fullScreen)
                         .build())
                 .add(frameRate.vsync())
+                .add(frameRate.presentMode())
                 .add(frameRate.maxFramerate())
                 .build());
 
@@ -350,10 +352,11 @@ public class SodiumGameOptionPages {
                             MultiDrawMode[] allowed = MultiDrawModeResolver.indirectSupported() ? MultiDrawMode.values() : new MultiDrawMode[]{MultiDrawMode.DIRECT, MultiDrawMode.INDIVIDUAL};
                             return new CyclingControl<>(o, MultiDrawMode.class, allowed);
                         })
-                        .setBinding((opts, value) -> opts.advanced.multiDrawMode = value, opts -> opts.advanced.multiDrawMode)
+                        .setBinding((opts, value) -> opts.advanced.multiDrawMode = value,
+                            opts -> BackendManager.RENDER_BACKEND.isIndirectRequired() ? MultiDrawMode.INDIRECT : opts.advanced.multiDrawMode)
                         .setFlags(OptionFlag.REQUIRES_RENDERER_RELOAD)
                         .setImpact(OptionImpact.VARIES)
-                        .setEnabled(GLStateManager.capabilities != null)
+                        .setEnabled(GLStateManager.capabilities != null && !BackendManager.RENDER_BACKEND.isIndirectRequired())
                         .build())
                 .add(OptionImpl.createBuilder(StreamingUploader.UploadStrategy.class, sodiumOpts)
                     .setName(I18n.format("sodium.options.upload_method.name"))
@@ -571,7 +574,7 @@ public class SodiumGameOptionPages {
                         .setControl(o -> new SliderControl(o, MIN_RENDER_AHEAD, MAX_RENDER_AHEAD, 1, ControlValueFormatter.quantity("sodium.options.cpu_render_ahead_limit.value")))
                         .setImpact(OptionImpact.MEDIUM)
                         .setBinding((opts, value) -> opts.performance.cpuRenderAheadLimit = value, opts -> opts.performance.cpuRenderAheadLimit)
-                        .setEnabled(GLStateManager.capabilities != null && GLStateManager.capabilities.OpenGL32)
+                        .setEnabled(GLStateManager.capabilities != null && GLStateManager.capabilities.OpenGL32 && !GLStateManager.hasSwapchainBackpressure())
                         .build())
 
                 .build());
@@ -683,6 +686,7 @@ public class SodiumGameOptionPages {
         final FrameRateOptions frameRate = FrameRateOptions.create(vanillaOpts, sodiumOpts);
         groups.add(OptionGroup.createBuilder()
                 .add(frameRate.vsync())
+                .add(frameRate.presentMode())
                 .add(frameRate.maxFramerate())
                 .build());
 

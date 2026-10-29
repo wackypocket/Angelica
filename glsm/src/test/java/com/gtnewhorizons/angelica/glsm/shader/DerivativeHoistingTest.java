@@ -1,10 +1,8 @@
-package com.gtnewhorizons.angelica.sdlgpu.shader;
+package com.gtnewhorizons.angelica.glsm.shader;
 
 import com.gtnewhorizons.angelica.glsm.GlslTransformUtils;
-import com.gtnewhorizons.angelica.glsm.shader.GlslVulkanPreprocess;
 import com.gtnewhorizons.angelica.glsm.shader.GlslVulkanPreprocess.Edit;
-import com.gtnewhorizons.angelica.glsm.shader.ShaderIndex;
-import com.gtnewhorizons.angelica.glsm.shader.SpirvCompiler;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.lwjgl.util.shaderc.Shaderc;
 
@@ -17,6 +15,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.lwjgl.system.MemoryUtil.memFree;
 
+@Tag("lwjgl3") // compiles the rewritten GLSL with shaderc, so it runs in spirvTest
 class DerivativeHoistingTest {
 
     private static String hoist(String source) {

@@ -486,12 +486,12 @@ public class AngelicaConfig {
     @Config.RequiresMcRestart
     public static int glVersion;
 
-    @Config.Comment("Render backend: OPENGL, or SDL_GPU (experimental; Vulkan/Metal/Direct3D 12 through SDL3, falls back to OpenGL when no device can be created). -Dangelica.sdlgpu.enable=true|false overrides this.")
+    @Config.Comment("Render backend: OPENGL or VULKAN (testing; through the included MoltenVK on macOS). -Dangelica.experimentalBackends=true also allows SDL_GPU (Vulkan/Metal/Direct3D 12 through SDL3), METAL and D3D12. All of them fall back to OpenGL when no device can be created. -Dangelica.sdlgpu.enable, -Dangelica.vulkan, -Dangelica.metal and -Dangelica.d3d12 override this.")
     @Config.DefaultEnum("OPENGL")
     @Config.RequiresMcRestart
     public static RenderBackendChoice renderBackend;
 
-    @Config.Comment("SDL GPU driver: AUTO, VULKAN, METAL (macOS), D3D12 (Windows). Vulkan on macOS needs MoltenVK and uses Metal without it. -Dangelica.sdlgpu.driver overrides this.")
+    @Config.Comment("SDL GPU driver: AUTO, VULKAN, METAL (macOS), D3D12 (Windows). Vulkan on macOS runs through the included MoltenVK and uses Metal if it cannot start. -Dangelica.sdlgpu.driver overrides this.")
     @Config.DefaultEnum("AUTO")
     @Config.RequiresMcRestart
     public static SdlGpuDriver sdlGpuDriver;
@@ -570,6 +570,14 @@ public class AngelicaConfig {
 
     public static boolean sdlGpuConfigured() {
         return renderBackend == RenderBackendChoice.SDL_GPU;
+    }
+
+    public static boolean nativeConfigured() {
+        return renderBackend != null && renderBackend.isNative();
+    }
+
+    public static String nativeDriverName() {
+        return renderBackend == null ? "" : renderBackend.nativeDriver();
     }
 
     public static String sdlGpuDriverName() {

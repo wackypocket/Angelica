@@ -140,6 +140,9 @@ public final class Lwjgl2GLRenderBackend extends RenderBackend {
     }
 
     @Override
+    public boolean canPumpDisplayMessagesOffThread() { return false; }
+
+    @Override
     public void updateDisplayFromWorkerThread(boolean processMessages) {
         if (processMessages) pumpDisplayMessages();
         Display.update(false);

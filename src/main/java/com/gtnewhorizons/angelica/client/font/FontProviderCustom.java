@@ -210,7 +210,8 @@ public final class FontProviderCustom implements FontProvider {
         long availLo = 0L;
         long availHi = 0L;
         for (int i = 0; i < ATLAS_SIZE; i++) {
-            if (f.canDisplay((char) (i + ATLAS_SIZE * id))) {
+            final char ch = (char) (i + ATLAS_SIZE * id);
+            if (!Character.isISOControl(ch) && f.canDisplay(ch)) {
                 if (i < 64) { availLo |= 1L << i; } else { availHi |= 1L << (i - 64); }
             }
         }

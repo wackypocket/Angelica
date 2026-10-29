@@ -1,12 +1,14 @@
 package com.gtnewhorizons.angelica.sdlgpu.shader;
 
 import com.gtnewhorizons.angelica.config.SystemProperties;
+import com.gtnewhorizons.angelica.glsm.CompatShaderTransformer;
 import com.gtnewhorizons.angelica.glsm.GlslTransformUtils;
 import com.gtnewhorizons.angelica.glsm.hooks.GLSMHooks;
 import com.gtnewhorizons.angelica.glsm.hooks.PerFrameUniformBlock;
 import com.gtnewhorizons.angelica.glsm.hooks.PerFrameUniformBlock.Member;
 import com.gtnewhorizons.angelica.glsm.shader.GlslVulkanPreprocess;
 import com.gtnewhorizons.angelica.glsm.shader.GlslVulkanPreprocess.Edit;
+import com.gtnewhorizons.angelica.glsm.shader.DerivativeHoisting;
 import com.gtnewhorizons.angelica.glsm.shader.ShaderCacheIO;
 import com.gtnewhorizons.angelica.glsm.shader.ShaderDiskCache;
 import com.gtnewhorizons.angelica.glsm.shader.ShaderIndex;
@@ -87,8 +89,7 @@ public final class ShaderManager {
 
     public void setUniformReleaseListener(Consumer<ProgramObject> listener) { this.uniformReleaseListener = listener; }
 
-    private int nextShaderId = 1;
-    private int nextProgramId = 1;
+    private int nextObjectId = 1;
     private final Int2ObjectOpenHashMap<ShaderObject> shaderObjects = new Int2ObjectOpenHashMap<>();
     private final Int2ObjectOpenHashMap<ProgramObject> programObjects = new Int2ObjectOpenHashMap<>();
 
@@ -189,7 +190,7 @@ public final class ShaderManager {
     }
 
     public int createShader(int type) {
-        final int id = nextShaderId++;
+        final int id = nextObjectId++;
         shaderObjects.put(id, new ShaderObject(type));
         return id;
     }
@@ -511,7 +512,7 @@ public final class ShaderManager {
     }
 
     public int createProgram() {
-        final int id = nextProgramId++;
+        final int id = nextObjectId++;
         programObjects.put(id, new ProgramObject());
         return id;
     }
@@ -535,6 +536,15 @@ public final class ShaderManager {
         shObj.attachCount++;
     }
 
+    // A program with only a fragment shader gets a generated pass-through vertex stage, deleted along with the program.
+    private int passthroughVertexFor(ShaderObject fs) {
+        final int id = createShader(GL20.GL_VERTEX_SHADER);
+        shaderSource(id, CompatShaderTransformer.generatePassthroughVertexShader(fs.source));
+        compileShader(id);
+        shaderObjects.get(id).deletePending = true;
+        return id;
+    }
+
     private static String stageLinkError(String stage, ShaderObject obj) {
         return stage + (obj == null ? " shader missing" : " shader not compiled");
     }
@@ -548,8 +558,9 @@ public final class ShaderManager {
             return;
         }
 
-        final ShaderObject vs = shaderObjects.get(prog.vertexShader);
         final ShaderObject fs = shaderObjects.get(prog.fragmentShader);
+        if (prog.vertexShader == 0 && prog.geometryShader == 0 && fs != null && fs.compiled) attachShader(program, passthroughVertexFor(fs));
+        final ShaderObject vs = shaderObjects.get(prog.vertexShader);
         final ShaderObject gs = prog.geometryShader != 0 ? shaderObjects.get(prog.geometryShader) : null;
 
         final boolean vertexBad = vs == null || !vs.compiled;

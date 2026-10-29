@@ -92,6 +92,7 @@ public class GLSM_ServerSideState_UnitTest {
                         if (pendingCommand != null && !shutdownRequested) {
                             try {
                                 pendingCommand.run();
+                                GL11.glFlush();
                             } catch (Throwable t) {
                                 backgroundError = t;
                             }
@@ -161,6 +162,8 @@ public class GLSM_ServerSideState_UnitTest {
         readyLatch = new CountDownLatch(1);
         commandLatch = new CountDownLatch(1);
         completeLatch = new CountDownLatch(1);
+
+        GL11.glFlush();
 
         // Set command and signal
         pendingCommand = command;

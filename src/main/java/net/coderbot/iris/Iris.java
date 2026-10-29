@@ -1035,6 +1035,7 @@ public class Iris {
             } finally {
                 RetainedPrograms.afterPipelineBuilt();
             }
+            BackendManager.RENDER_BACKEND.finishPendingShaderCompiles();
             long endTime = System.nanoTime();
             logger.info("[Load #{}] Total shaderpack load time for '{}' in dimension '{}': {} ms", shaderPackLoadId, currentPackName, dimensionName, String.format("%.1f", (endTime - startTime) / 1_000_000.0));
             return pipeline;

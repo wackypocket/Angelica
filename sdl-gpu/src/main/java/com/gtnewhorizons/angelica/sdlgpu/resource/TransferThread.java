@@ -73,6 +73,7 @@ public final class TransferThread {
     private static final long FLUSH_COALESCE_BYTES = 8L * 1024 * 1024;
     private static final int FLUSH_COALESCE_COMMANDS = 128;
     private static final long WAKE_COALESCE_ENQUEUES = 16;
+    private static final long WAKE_BYTES = 256L * 1024; // uploads this large wake the thread at once rather than coalescing with later ones
     private static final long AWAIT_SPIN_NS = 30_000L;
 
     private long openCB;
@@ -107,7 +108,7 @@ public final class TransferThread {
 
     public void enqueue(DeferredUpload upload) {
         synchronized (queue) { queue.addLast(upload); }
-        if (shouldWakeOnEnqueue(upload.seq())) wake();
+        if (shouldWakeOnEnqueue(upload.seq()) || upload.size() >= WAKE_BYTES) wake();
     }
 
     private DeferredUpload pollUpload() {
@@ -489,6 +490,8 @@ public final class TransferThread {
 
     public sealed interface DeferredUpload permits StagingReadUpload, PreCopiedUpload, GpuCopyUpload, TextureRegionUpload {
         public long seq();
+
+        public long size();
     }
 
     public static final class StagingReadUpload implements DeferredUpload {
@@ -523,6 +526,8 @@ public final class TransferThread {
         }
 
         @Override public long seq() { return seq; }
+
+        @Override public long size() { return size; }
     }
 
     public static final class PreCopiedUpload implements DeferredUpload {
@@ -554,6 +559,8 @@ public final class TransferThread {
         }
 
         @Override public long seq() { return seq; }
+
+        @Override public long size() { return size; }
     }
 
     public static final class GpuCopyUpload implements DeferredUpload {
@@ -586,6 +593,8 @@ public final class TransferThread {
         }
 
         @Override public long seq() { return seq; }
+
+        @Override public long size() { return size; }
     }
 
     public static final class TextureRegionUpload implements DeferredUpload {
@@ -623,5 +632,7 @@ public final class TransferThread {
         }
 
         @Override public long seq() { return seq; }
+
+        @Override public long size() { return size; }
     }
 }

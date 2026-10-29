@@ -157,7 +157,7 @@ class FontProviderCustomGLTest {
     @Test
     void availabilityMatchesFont() {
         for (int i = 0; i < FontProviderCustom.ATLAS_SIZE; i++) {
-            assertEquals(font.canDisplay((char) i), provider.isGlyphAvailable((char) i), "availability differs from the font for slot " + i);
+            assertEquals(!Character.isISOControl((char) i) && font.canDisplay((char) i), provider.isGlyphAvailable((char) i), "availability differs from the font for slot " + i);
             assertEquals(font.canDisplay((char) (SURROGATE + i)), provider.isGlyphAvailable((char) (SURROGATE + i)), "availability differs from the font for surrogate slot " + i);
         }
     }
