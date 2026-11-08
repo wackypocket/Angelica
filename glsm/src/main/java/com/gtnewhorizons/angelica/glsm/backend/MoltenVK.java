@@ -22,7 +22,6 @@ public final class MoltenVK {
     }
 
     public static final String ENV_VULKAN_LIBRARY = "SDL_VULKAN_LIBRARY";
-    public static final String JAR_NAME = "angelica-moltenvk";
 
     private static final Logger LOGGER = LogManager.getLogger("Angelica/MoltenVK");
     private static final String LIB_NAME = "libMoltenVK.dylib";

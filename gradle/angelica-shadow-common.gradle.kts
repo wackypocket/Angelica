@@ -1,12 +1,19 @@
 import com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar
 
 val embedOnly: Configuration by configurations
-// Only the root build has the native backends; Umbra applies this script too
+// Only the root build bundles MoltenVK and has the native backends; Umbra applies this script too
+val bundledMoltenVK = configurations.findByName("bundledMoltenVK")
 val nativeProjects = listOf(":glemu", ":vulkan", ":metal").filter { findProject(it) != null }
 
 tasks.named<ShadowJar>("shadowJar") {
     dependsOn(embedOnly)
     from(embedOnly.map(::zipTree))
+    if (bundledMoltenVK != null) {
+        dependsOn(bundledMoltenVK)
+        from(provider { bundledMoltenVK.map(::zipTree) }) {
+            exclude("META-INF/**")
+        }
+    }
 
     duplicatesStrategy = DuplicatesStrategy.INCLUDE
     mergeServiceFiles()

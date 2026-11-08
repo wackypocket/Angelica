@@ -88,6 +88,26 @@ val distJar = tasks.register<Jar>("distJar") {
     }
 }
 
+// The dylibs and their license, without the coremod, for the main jar to embed.
+val bundledNativesJar = tasks.register<Jar>("bundledNativesJar") {
+    archiveClassifier.set("bundled-natives")
+    from(extractMoltenVK)
+    from("src/main/resources/LICENSE-MoltenVK")
+}
+
+val bundledNatives by configurations.creating {
+    isCanBeConsumed = true
+    isCanBeResolved = false
+    attributes {
+        attribute(rfgObfAttr, "mcp")
+        attribute(rfgTransformedAttr, true)
+    }
+}
+
+artifacts {
+    add(bundledNatives.name, bundledNativesJar)
+}
+
 publishing {
     publications {
         create<MavenPublication>("mavenJava") {

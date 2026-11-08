@@ -40,6 +40,12 @@ val embedOnly by configurations.creating {
     isCanBeResolved = true
 }
 
+// MoltenVK dylibs copied into the main jar as plain resources; bundleMoltenVK=false leaves them to angelica-moltenvk.jar
+val bundledMoltenVK by configurations.creating {
+    isCanBeConsumed = false
+    isCanBeResolved = true
+}
+
 // Add the transformed mod dependencies to the compilation classpaths, but don't publish them in the Maven metadata
 configurations["compileClasspath"].extendsFrom(transformedMod, transformedModCompileOnly, embedOnly)
 configurations["testCompileClasspath"].extendsFrom(transformedMod, transformedModCompileOnly, embedOnly)
@@ -99,6 +105,9 @@ DependencyHandlerScope.of(dependencies).apply {
     runtimeOnlyNonPublishable(project(":tracy-client")) { isTransitive = false }
     if (System.getProperty("os.name").lowercase().contains("mac")) {
         runtimeOnlyNonPublishable(project(":moltenvk")) { isTransitive = false }
+    }
+    if (providers.gradleProperty("bundleMoltenVK").orNull != "false") {
+        bundledMoltenVK(project(mapOf("path" to ":moltenvk", "configuration" to "bundledNatives")))
     }
     devOnlyNonPublishable(libs.async.profiler)
     runtimeOnlyNonPublishable(libs.jvmdowngrader.java.api) { artifact { classifier = "downgraded-8" } }
