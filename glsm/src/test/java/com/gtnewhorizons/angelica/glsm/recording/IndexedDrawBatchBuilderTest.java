@@ -78,10 +78,9 @@ class IndexedDrawBatchBuilderTest extends DisplayListTestFixture {
         assertEquals(GL11.GL_TRIANGLES, cmd.getDrawMode());
         assertEquals(6, cmd.getIndexCount());
 
-        // EBO is widened to UNSIGNED_INT and uses GL_LAST_VERTEX_CONVENTION:
-        // (a,b,d,b,c,d) — v3 is the provoking vertex for both triangles, diagonal b→d.
+        // EBO is widened to UNSIGNED_INT and split as display lists bake quads: (a,b,c,c,d,a), diagonal a→c.
         final ByteBuffer ib = readBufferBytes(GL15.GL_ELEMENT_ARRAY_BUFFER, firstBatch(list).getSharedEBO(), 6 * 4);
-        assertUintIndices(ib, 0, 1, 3, 1, 2, 3);
+        assertUintIndices(ib, 0, 1, 2, 2, 3, 0);
         MemoryUtilities.memFree(ib);
     }
 
@@ -465,7 +464,7 @@ class IndexedDrawBatchBuilderTest extends DisplayListTestFixture {
                 final IntBuffer idx = BufferUtils.createIntBuffer(4);
                 idx.put(new int[]{0, 1, 2, 3}).flip();
                 GLSMDraws.glDrawElements(GL11.GL_QUADS, idx);
-            }, GL11.GL_TRIANGLES, 6, new int[]{0, 1, 3, 1, 2, 3}),
+            }, GL11.GL_TRIANGLES, 6, new int[]{0, 1, 2, 2, 3, 0}),
             arguments("compile-and-execute fires live and bakes", GL11.GL_COMPILE_AND_EXECUTE, (Runnable) () -> {
                 final IntBuffer idx = BufferUtils.createIntBuffer(3);
                 idx.put(new int[]{0, 1, 2}).flip();

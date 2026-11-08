@@ -2,6 +2,7 @@ package com.gtnewhorizons.angelica.glsm.texture;
 
 import com.gtnewhorizons.angelica.glsm.GLSMTextures;
 import com.gtnewhorizons.angelica.glsm.GLStateManager;
+import com.gtnewhorizons.angelica.glsm.backend.BackendManager;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import org.jetbrains.annotations.Nullable;
@@ -61,6 +62,19 @@ public class TextureInfoCache {
     }
 
     private void defineLevelZero(int texture, int target, int internalformat, int width, int height) {
+        // GL refuses a size over its limits, which leaves the texture as it was. Every implementation takes up to GL 3.3's minimums,
+        // so only a larger size needs the limit asked for.
+        final boolean volume = target == GL12.GL_TEXTURE_3D;
+        if (Math.max(width, height) > (volume ? 256 : 1024)) {
+            final int kind = volume ? 1 : target == GL13.GL_TEXTURE_CUBE_MAP ? 2 : 0;
+            final int[] limits = GLStateManager.ctx().textureSizeLimits;
+            if (limits[kind] == 0) {
+                limits[kind] = BackendManager.RENDER_BACKEND.getInteger(kind == 1 ? GL12.GL_MAX_3D_TEXTURE_SIZE
+                    : kind == 2 ? GL13.GL_MAX_CUBE_MAP_TEXTURE_SIZE : GL11.GL_MAX_TEXTURE_SIZE);
+            }
+            final int max = limits[kind];
+            if (max > 0 && (width > max || height > max)) return;
+        }
         final TextureInfo info = getInfo(texture);
         if (info == null) return;
         info.setTarget(target);

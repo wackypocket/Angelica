@@ -89,6 +89,7 @@ public class GLContextState {
     public int lightingGeneration;
     // fog + alpha ref + overlay color
     public int fragmentGeneration;
+    public int stencilFace;
     // current vertex color
     public int colorGeneration;
     // clip plane equation changes
@@ -115,6 +116,8 @@ public class GLContextState {
     public final StateSet[] attribSets = new StateSet[GLStateManager.MAX_ATTRIB_STACK_DEPTH];
     public RetainedState retainedOwner;
     public int attribDepth = 0;
+    /** An error of a call GLSM answers without the backend, for glGetError to report. */
+    public int pendingError = GL11.GL_NO_ERROR;
 
     public boolean savesState(int id) {
         for (int i = attribDepth - 1; i >= 0; i--) {
@@ -195,6 +198,12 @@ public class GLContextState {
     public final PolygonStateStack polygonState = member(new PolygonStateStack(StackIdAllocator.nextId()));
     public final StencilStateStack stencilState = member(new StencilStateStack(StackIdAllocator.nextId()));
     public int stencilBitMask = 0xFFFFFFFF;
+    /** One past the highest vertex the next draw reads from client arrays, or -1 when the draw does not say. */
+    public int clientVertexEnd = -1;
+    /** glDrawBuffers(int) as the list form the backend checks, without a buffer per call. */
+    public final java.nio.IntBuffer oneDrawBuffer = org.lwjgl.BufferUtils.createIntBuffer(1);
+    /** GL_MAX_TEXTURE_SIZE, GL_MAX_3D_TEXTURE_SIZE and GL_MAX_CUBE_MAP_TEXTURE_SIZE once asked for, 0 until then. */
+    public final int[] textureSizeLimits = new int[3];
     public final BooleanStateStack autoNormalState = track(new BooleanStateStack(GL11.GL_AUTO_NORMAL, false, true));
     public final BooleanStateStack map1Color4State = track(new BooleanStateStack(GL11.GL_MAP1_COLOR_4, false, true));
     public final BooleanStateStack map1IndexState = track(new BooleanStateStack(GL11.GL_MAP1_INDEX, false, true));
@@ -234,6 +243,9 @@ public class GLContextState {
     public int activeProgram = 0;
     public final IntegerStateStack programStack = member(new IntegerStateStack(0, StackIdAllocator.nextId()));
     public int listBase = 0;
+    /** GL_FOG_COORDINATE_SOURCE and GL_FOG_INDEX, kept to answer queries. */
+    public int fogCoordSource = GL14.GL_FRAGMENT_DEPTH;
+    public float fogIndex;
     public int boundVBO;
     public int boundVAO;
     public int boundPixelUnpackBuffer;

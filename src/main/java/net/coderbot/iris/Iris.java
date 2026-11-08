@@ -170,7 +170,7 @@ public class Iris {
                 TransformPatcher.clearCache();
                 ShaderTransformer.clearCache();
                 GlslVulkanPreprocess.clearCache();
-                if (RenderSystem.isGLES() || BackendManager.RENDER_BACKEND.isSDLGPU()) SpirvCompiler.clearCache();
+                if (RenderSystem.isGLES() || BackendManager.RENDER_BACKEND.emulatesGL()) SpirvCompiler.clearCache();
                 SDLGPUGate.clearShaderPrewarmCache();
             });
         }
@@ -1023,7 +1023,6 @@ public class Iris {
         }
 
         final ProgramSet programs = currentPack.getProgramSet(dimensionName);
-
         try {
             shaderPackLoadId++;
             ShaderTransformExecutor.prepare();

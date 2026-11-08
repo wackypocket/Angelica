@@ -4,6 +4,7 @@ import com.gtnewhorizon.gtnhlib.bytebuf.MemoryUtilities;
 import com.gtnewhorizons.angelica.glsm.ffp.FfpExtendedAttribs;
 import it.unimi.dsi.fastutil.ints.Int2IntMap;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
+import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL15;
 import org.lwjgl.opengl.GL21;
 import org.lwjgl.opengl.GL30;
@@ -314,7 +315,8 @@ public final class GLSMBuffers {
             glBufferData(target, size, usage);
             return;
         }
-        glBufferData(target, MemoryUtilities.memByteBuffer(data, checkedSize(size)), usage);
+        if (!wrappable(size)) return;
+        glBufferData(target, MemoryUtilities.memByteBuffer(data, (int) size), usage);
     }
 
     public static void glBufferSubData(int target, long offset, ByteBuffer data) { onBufferRespec(target); RENDER_BACKEND.bufferSubData(target, offset, data); }
@@ -349,7 +351,7 @@ public final class GLSMBuffers {
         MemoryUtilities.memFree(copy);
     }
 
-    public static void nglBufferSubData(int target, long offset, long size, long data) { glBufferSubData(target, offset, MemoryUtilities.memByteBuffer(data, checkedSize(size))); }
+    public static void nglBufferSubData(int target, long offset, long size, long data) { if (wrappable(size)) glBufferSubData(target, offset, MemoryUtilities.memByteBuffer(data, (int) size)); }
 
     public static ByteBuffer glMapBuffer(int target, int access) {
         rejectExitCapture();
@@ -384,12 +386,12 @@ public final class GLSMBuffers {
         return RENDER_BACKEND.unmapBuffer(target);
     }
 
-    public static void glGetBufferSubData(int target, long offset, ByteBuffer data) { rejectExitCapture(); RENDER_BACKEND.getBufferSubData(target, offset, data); }
-    public static void glGetBufferSubData(int target, long offset, ShortBuffer data) { rejectExitCapture(); RENDER_BACKEND.getBufferSubData(target, offset, data); }
-    public static void glGetBufferSubData(int target, long offset, IntBuffer data) { rejectExitCapture(); RENDER_BACKEND.getBufferSubData(target, offset, data); }
-    public static void glGetBufferSubData(int target, long offset, FloatBuffer data) { rejectExitCapture(); RENDER_BACKEND.getBufferSubData(target, offset, data); }
-    public static void glGetBufferSubData(int target, long offset, DoubleBuffer data) { rejectExitCapture(); RENDER_BACKEND.getBufferSubData(target, offset, data); }
-    public static void glGetBufferSubData(int target, long offset, LongBuffer data) { glGetBufferSubData(target, offset, MemoryUtilities.memByteBuffer(data)); }
+    public static void glGetBufferSubData(int target, long offset, ByteBuffer data) { if (!RENDER_BACKEND.checks().glGetBufferSubData(target)) return; rejectExitCapture(); RENDER_BACKEND.getBufferSubData(target, offset, data); }
+    public static void glGetBufferSubData(int target, long offset, ShortBuffer data) { if (!RENDER_BACKEND.checks().glGetBufferSubData(target)) return; rejectExitCapture(); RENDER_BACKEND.getBufferSubData(target, offset, data); }
+    public static void glGetBufferSubData(int target, long offset, IntBuffer data) { if (!RENDER_BACKEND.checks().glGetBufferSubData(target)) return; rejectExitCapture(); RENDER_BACKEND.getBufferSubData(target, offset, data); }
+    public static void glGetBufferSubData(int target, long offset, FloatBuffer data) { if (!RENDER_BACKEND.checks().glGetBufferSubData(target)) return; rejectExitCapture(); RENDER_BACKEND.getBufferSubData(target, offset, data); }
+    public static void glGetBufferSubData(int target, long offset, DoubleBuffer data) { if (!RENDER_BACKEND.checks().glGetBufferSubData(target)) return; rejectExitCapture(); RENDER_BACKEND.getBufferSubData(target, offset, data); }
+    public static void glGetBufferSubData(int target, long offset, LongBuffer data) { if (!RENDER_BACKEND.checks().glGetBufferSubData(target)) return; glGetBufferSubData(target, offset, MemoryUtilities.memByteBuffer(data)); }
     public static void glGetBufferSubData(int target, long offset, short[] data) {
         final ByteBuffer copy = MemoryUtilities.memAlloc(data.length << 1);
         glGetBufferSubData(target, offset, copy);
@@ -421,15 +423,22 @@ public final class GLSMBuffers {
         MemoryUtilities.memFree(copy);
     }
 
-    public static void nglGetBufferSubData(int target, long offset, long size, long data) { glGetBufferSubData(target, offset, MemoryUtilities.memByteBuffer(data, checkedSize(size))); }
+    public static void nglGetBufferSubData(int target, long offset, long size, long data) { if (wrappable(size)) glGetBufferSubData(target, offset, MemoryUtilities.memByteBuffer(data, (int) size)); }
 
-    public static int glGetBufferParameteri(int target, int pname) { rejectExitCapture(); return RENDER_BACKEND.getBufferParameteri(target, pname); }
+    public static int glGetBufferParameteri(int target, int pname) { if (!RENDER_BACKEND.checks().glGetBufferParameteriv(target, pname)) return 0; rejectExitCapture(); return RENDER_BACKEND.getBufferParameteri(target, pname); }
     public static int glGetBufferParameter(int target, int pname) { return glGetBufferParameteri(target, pname); }
     public static void glGetBufferParameter(int target, int pname, IntBuffer params) { params.put(params.position(), glGetBufferParameteri(target, pname)); }
-    public static void glGetBufferParameteriv(int target, int pname, IntBuffer params) { params.put(params.position(), glGetBufferParameteri(target, pname)); }
-    public static void glGetBufferParameteriv(int target, int pname, int[] params) { params[0] = glGetBufferParameteri(target, pname); }
+    public static void glGetBufferParameteriv(int target, int pname, IntBuffer params) { if (!RENDER_BACKEND.checks().glGetBufferParameteriv(target, pname)) return; params.put(params.position(), glGetBufferParameteri(target, pname)); }
+    public static void glGetBufferParameteriv(int target, int pname, int[] params) { if (!RENDER_BACKEND.checks().glGetBufferParameteriv(target, pname)) return; params[0] = glGetBufferParameteri(target, pname); }
 
-    public static void glBufferStorage(int target, long size, int flags) { onBufferStorage(target, flags); RENDER_BACKEND.bufferStorage(target, size, flags); }
+    public static void glBufferStorage(int target, long size, int flags) {
+        if (size <= 0) {
+            GLStateManager.recordError(GL11.GL_INVALID_VALUE);
+            return;
+        }
+        onBufferStorage(target, flags);
+        RENDER_BACKEND.bufferStorage(target, size, flags);
+    }
     public static void glBufferStorage(int target, ByteBuffer data, int flags) { onBufferStorage(target, flags); RENDER_BACKEND.bufferStorage(target, data, flags); }
     public static void glBufferStorage(int target, ShortBuffer data, int flags) { glBufferStorage(target, MemoryUtilities.memByteBuffer(data), flags); }
     public static void glBufferStorage(int target, IntBuffer data, int flags) { glBufferStorage(target, MemoryUtilities.memByteBuffer(data), flags); }
@@ -526,11 +535,11 @@ public final class GLSMBuffers {
     public static boolean glIsBuffer(int buffer) { rejectExitCapture(); return RENDER_BACKEND.isBuffer(buffer); }
     public static void glCopyBufferSubData(int readTarget, int writeTarget, long readOffset, long writeOffset, long size) { onBufferRespec(writeTarget); RENDER_BACKEND.copyBufferSubData(readTarget, writeTarget, readOffset, writeOffset, size); }
 
-    private static int checkedSize(long size) {
-        if (size < 0 || size > Integer.MAX_VALUE) {
-            throw new IllegalArgumentException("Buffer range does not fit a ByteBuffer wrapper: " + size);
-        }
-        return (int) size;
+    /** A negative size is GL's to refuse, and one past what a ByteBuffer can wrap is memory this path cannot reach. */
+    private static boolean wrappable(long size) {
+        if (size < 0) GLStateManager.recordError(GL11.GL_INVALID_VALUE);
+        else if (size > Integer.MAX_VALUE) GLStateManager.recordError(GL11.GL_OUT_OF_MEMORY);
+        return size >= 0 && size <= Integer.MAX_VALUE;
     }
 
     private static ByteBuffer copyOf(short[] data) {

@@ -103,7 +103,8 @@ public final class VertexShaderGenerator {
 
     private static void emitOutputs(StringBuilder sb, VertexKey key) {
         sb.append("// Outputs\n");
-        sb.append("out vec4 v_Color;\n");
+        final String colorQualifier = key.flatShade() ? "flat " : "";
+        sb.append(colorQualifier).append("out vec4 v_Color;\n");
         sb.append("invariant gl_Position;\n");
         if (key.instancing().hasInstanceHead()) {
             sb.append("out vec4 v_Overlay;\n");
@@ -115,7 +116,7 @@ public final class VertexShaderGenerator {
             sb.append(ClipDistanceGlsl.VS_OUT_DIST0).append('\n').append(ClipDistanceGlsl.VS_OUT_DIST1).append('\n');
         }
         if (key.separateSpecular()) {
-            sb.append("out vec3 v_SpecularColor;\n");
+            sb.append(colorQualifier).append("out vec3 v_SpecularColor;\n");
         }
         // Per-unit varying outputs. Each enabled texture unit (and texgen, which targets unit 0) gets its own v_TexCoord<i>.
         if (key.unitTexCoordEnabled(0) || key.texGenEnabled()) {

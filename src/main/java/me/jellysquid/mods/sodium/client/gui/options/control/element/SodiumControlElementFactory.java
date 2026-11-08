@@ -5,12 +5,18 @@ import me.jellysquid.mods.sodium.client.gui.options.control.ControlElement;
 import me.jellysquid.mods.sodium.client.gui.options.control.ControlValueFormatter;
 import me.jellysquid.mods.sodium.client.gui.utils.Rect2i;
 import me.jellysquid.mods.sodium.client.util.Dim2i;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.ScaledResolution;
+import net.minecraft.util.EnumChatFormatting;
 import net.minecraft.util.MathHelper;
 import org.lwjgl.input.Keyboard;
+import org.lwjgl.input.Mouse;
+
+import java.util.function.Supplier;
 
 public class SodiumControlElementFactory implements ControlElementFactory {
     @Override
-    public <T extends Enum<T>> ControlElement<T> cyclingControlElement(Option<T> option, Dim2i dim, T[] allowedValues, String[] names) {
+    public <T extends Enum<T>> ControlElement<T> cyclingControlElement(Option<T> option, Dim2i dim, Supplier<T[]> allowedValues, String[] names) {
         return new CyclingControlElement<>(option, dim, allowedValues, names);
     }
 
@@ -25,10 +31,10 @@ public class SodiumControlElementFactory implements ControlElementFactory {
     }
 
     private static class CyclingControlElement<T extends Enum<T>> extends SodiumControlElement<T> {
-        private final T[] allowedValues;
+        private final Supplier<T[]> allowedValues;
         private final String[] names;
 
-        public CyclingControlElement(Option<T> option, Dim2i dim, T[] allowedValues, String[] names) {
+        public CyclingControlElement(Option<T> option, Dim2i dim, Supplier<T[]> allowedValues, String[] names) {
             super(option, dim);
 
             this.allowedValues = allowedValues;
@@ -36,20 +42,34 @@ public class SodiumControlElementFactory implements ControlElementFactory {
         }
 
         private int currentIndex() {
-            for (int i = 0; i < this.allowedValues.length; i++) {
-                if (this.allowedValues[i] == this.option.getValue()) {
+            return Math.max(0, this.indexOfValue());
+        }
+
+        private int indexOfValue() {
+            final T[] allowed = this.allowedValues.get();
+            for (int i = 0; i < allowed.length; i++) {
+                if (allowed[i] == this.option.getValue()) {
                     return i;
                 }
             }
-            return 0;
+            return -1;
         }
 
         @Override
         public void render(int mouseX, int mouseY, float delta) {
             super.render(mouseX, mouseY, delta);
 
-            Enum<T> value = this.option.getValue();
-            String name = this.formatValue(this.names[value.ordinal()]);
+            // A stored value no choice offers, such as one above what this machine allows, still shows as what it is. A disabled
+            // option whose stored value is not among its choices is held at its first choice, so that is what it shows, greyed
+            // but not struck through since it is in effect: Present Mode keeps a tear-free mode while VSync is off, for example.
+            final T[] allowed = this.allowedValues.get();
+            final int index = this.indexOfValue();
+            final String name;
+            if (index < 0 && !this.option.isAvailable()) {
+                name = EnumChatFormatting.GRAY + this.names[allowed[0].ordinal()];
+            } else {
+                name = this.formatValue(this.names[(index >= 0 ? allowed[index] : this.option.getValue()).ordinal()]);
+            }
 
             int strWidth = this.getTextWidth(name);
             this.drawString(name, this.dim.getLimitX() - strWidth - 6, this.dim.getCenterY() - 4, 0xFFFFFFFF);
@@ -58,7 +78,8 @@ public class SodiumControlElementFactory implements ControlElementFactory {
         @Override
         public boolean mouseClicked(double mouseX, double mouseY, int button) {
             if (this.option.isAvailable() && this.dim.containsCursor(mouseX, mouseY) && (button == 0 || button == 1)) {
-                this.option.setValue(this.allowedValues[Math.floorMod(this.currentIndex() + (button == 0 ? 1 : -1), this.allowedValues.length)]);
+                final T[] allowed = this.allowedValues.get();
+                this.option.setValue(allowed[Math.floorMod(this.currentIndex() + (button == 0 ? 1 : -1), allowed.length)]);
                 this.playClickSound();
 
                 return true;
@@ -70,6 +91,7 @@ public class SodiumControlElementFactory implements ControlElementFactory {
 
     private static class SliderControlElement extends SodiumControlElement<Integer> {
         private static final int THUMB_WIDTH = 2, TRACK_HEIGHT = 1;
+        private static final int DEFAULT_WIDTH = 90, ROW_TEXT_SPACE = 170;
 
         private final Rect2i sliderBounds;
         private final ControlValueFormatter formatter;
@@ -77,8 +99,12 @@ public class SodiumControlElementFactory implements ControlElementFactory {
         private final int min;
         private final int range;
         private final int interval;
+        // A slider with far more values than GUI pixels is widened to one physical pixel per value and reads the unscaled mouse position.
+        private final boolean physicalPixels;
+        private final int guiScale;
 
         private double thumbPosition;
+        private boolean dragging;
 
         public SliderControlElement(Option<Integer> option, Dim2i dim, int min, int max, int interval, ControlValueFormatter formatter) {
             super(option, dim);
@@ -89,14 +115,25 @@ public class SodiumControlElementFactory implements ControlElementFactory {
             this.thumbPosition = this.getThumbPositionForValue(option.getValue());
             this.formatter = formatter;
 
-            this.sliderBounds = new Rect2i(dim.getLimitX() - 96, dim.getCenterY() - 5, 90, 10);
+            final Minecraft mc = Minecraft.getMinecraft();
+            final int values = this.range / this.interval;
+            this.physicalPixels = values > DEFAULT_WIDTH * 2;
+            this.guiScale = new ScaledResolution(mc, mc.displayWidth, mc.displayHeight).getScaleFactor();
+
+            final int width = this.physicalPixels ? Math.max(DEFAULT_WIDTH, Math.min((values + this.guiScale - 1) / this.guiScale, dim.getWidth() - ROW_TEXT_SPACE)) : DEFAULT_WIDTH;
+            this.sliderBounds = new Rect2i(dim.getLimitX() - width - 6, dim.getCenterY() - 5, width, 10);
         }
 
         @Override
         public void render(int mouseX, int mouseY, float delta) {
             super.render(mouseX, mouseY, delta);
 
-            if (this.option.isAvailable() && this.hovered) {
+            // The screen does not forward mouse releases to a control the cursor has left.
+            if (this.dragging && !Mouse.isButtonDown(0)) {
+                this.dragging = false;
+            }
+
+            if (this.option.isAvailable() && (this.hovered || this.dragging)) {
                 this.renderSlider();
             } else {
                 this.renderStandaloneValue();
@@ -154,6 +191,7 @@ public class SodiumControlElementFactory implements ControlElementFactory {
         public boolean mouseClicked(double mouseX, double mouseY, int button) {
             if (this.option.isAvailable() && button == 0 && this.sliderBounds.contains((int) mouseX, (int) mouseY)) {
                 this.setValueFromMouse(mouseX);
+                this.dragging = this.physicalPixels;
 
                 return true;
             }
@@ -162,6 +200,11 @@ public class SodiumControlElementFactory implements ControlElementFactory {
         }
 
         private void setValueFromMouse(double d) {
+            if (this.physicalPixels) {
+                this.setValue((Mouse.getEventX() - this.sliderBounds.getX() * this.guiScale) / (double) (this.sliderBounds.getWidth() * this.guiScale));
+                return;
+            }
+
             this.setValue((d - (double) this.sliderBounds.getX()) / (double) this.sliderBounds.getWidth());
         }
 
@@ -177,7 +220,7 @@ public class SodiumControlElementFactory implements ControlElementFactory {
 
         @Override
         public boolean mouseDragged(double mouseX, double mouseY, int button) {
-            if (this.option.isAvailable() && this.sliderBounds.contains((int) mouseX, (int) mouseY)) {
+            if (this.option.isAvailable() && (this.dragging || !this.physicalPixels && this.sliderBounds.contains((int) mouseX, (int) mouseY))) {
                 this.setValueFromMouse(mouseX);
 
                 return true;

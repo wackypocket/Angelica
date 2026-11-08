@@ -4,6 +4,7 @@ import com.gtnewhorizon.gtnhlib.client.renderer.CallbackTessellator;
 import com.gtnewhorizon.gtnhlib.client.renderer.DirectTessellator;
 import com.gtnewhorizon.gtnhlib.client.renderer.TessellatorManager;
 import com.gtnewhorizon.gtnhlib.client.renderer.vertex.VertexFormatElement.Usage;
+import com.gtnewhorizons.angelica.glsm.FeedbackManager;
 import com.gtnewhorizons.angelica.glsm.GLSMCurrentAttribs;
 import com.gtnewhorizons.angelica.glsm.GLStateManager;
 import com.gtnewhorizons.angelica.glsm.GLTypes;
@@ -117,6 +118,7 @@ public final class ImmediateModeRecorder {
      * Used for live immediate mode emulation only (not display list recording).
      */
     public static void beginLive(int primitiveType) {
+        FeedbackManager.immediateBegin(primitiveType);
         final DirectTessellator t = tessellator();
         t.reset();
         t.startDrawing(primitiveType);
@@ -153,6 +155,7 @@ public final class ImmediateModeRecorder {
             throw new IllegalStateException("glVertex called outside glBegin/glEnd");
         }
         t.addVertex(x, y, z);
+        if (FeedbackManager.capturesImmediate()) FeedbackManager.immediateVertex(x, y, z);
     }
 
     /**
@@ -201,6 +204,26 @@ public final class ImmediateModeRecorder {
     static {
         for (int i = 0; i < NUM_ATTRIBS; i++) {
             readers[i] = new AttribReader();
+        }
+    }
+
+    /** glArrayElement: one vertex of the current client arrays, between glBegin and glEnd. */
+    public static void arrayElement(int index) {
+        if (!isDrawing()) return;
+        final AttribSnapshot snap = AttribSnapshot.snapshot(index, 1);
+        if (snap == null) return;
+        try {
+            prepareReaders(snap);
+            if (positionReaderIndex >= 0) {
+                readVertexFromBuffer(tessellator(), index);
+                if (FeedbackManager.capturesImmediate()) {
+                    final AttribReader position = readers[positionReaderIndex];
+                    final int base = position.baseOffset + index * position.stride;
+                    FeedbackManager.immediateVertex(readComponent(position, base, 0), readComponent(position, base, 1), position.size > 2 ? readComponent(position, base, 2) : 0f);
+                }
+            }
+        } finally {
+            snap.free();
         }
     }
 

@@ -167,10 +167,13 @@ public final class GLSMBlend {
     }
 
     public static void glBlendEquation(int mode) {
+        if (!RENDER_BACKEND.checks().blendEquation(mode)) return;
         rejectExitCapture();
         final GLContextState glCtx = ctx();
-        if (DisplayListManager.isRecording()) {
-            throw DisplayListManager.unsupportedInList("glBlendEquation");
+        final RecordMode recording = DisplayListManager.getRecordMode();
+        if (recording != RecordMode.NONE) {
+            DisplayListManager.recordBlendEquationSeparate(mode, mode);
+            if (recording == RecordMode.COMPILE) return;
         }
         final boolean caching = isCachingEnabled();
         final boolean bypass = !caching;
@@ -184,10 +187,13 @@ public final class GLSMBlend {
     }
 
     public static void glBlendEquationSeparate(int modeRGB, int modeAlpha) {
+        if (!RENDER_BACKEND.checks().blendEquationSeparate(modeRGB, modeAlpha)) return;
         rejectExitCapture();
         final GLContextState glCtx = ctx();
-        if (DisplayListManager.isRecording()) {
-            throw DisplayListManager.unsupportedInList("glBlendEquationSeparate");
+        final RecordMode recording = DisplayListManager.getRecordMode();
+        if (recording != RecordMode.NONE) {
+            DisplayListManager.recordBlendEquationSeparate(modeRGB, modeAlpha);
+            if (recording == RecordMode.COMPILE) return;
         }
         final boolean caching = isCachingEnabled();
         final boolean bypass = !caching;
@@ -201,6 +207,7 @@ public final class GLSMBlend {
     }
 
     public static void tryBlendFuncSeparate(int srcRgb, int dstRgb, int srcAlpha, int dstAlpha) {
+        if (!RENDER_BACKEND.checks().blendFuncSeparate(srcRgb, dstRgb, srcAlpha, dstAlpha)) return;
         final GLContextState glCtx = ctx();
         glCtx.exitCapture.writeBlend();
         final RecordMode mode = DisplayListManager.getRecordMode();
@@ -238,6 +245,7 @@ public final class GLSMBlend {
     }
 
     public static void glBlendFuncSeparate(int srcRGB, int dstRGB, int srcAlpha, int dstAlpha) {
+        if (!RENDER_BACKEND.checks().blendFuncSeparate(srcRGB, dstRGB, srcAlpha, dstAlpha)) return;
         tryBlendFuncSeparate(srcRGB, dstRGB, srcAlpha, dstAlpha);
     }
 
@@ -288,6 +296,7 @@ public final class GLSMBlend {
     }
 
     public static void glLogicOp(int opcode) {
+        if (!RENDER_BACKEND.checks().logicOp(opcode)) return;
         rejectExitCapture();
         final RecordMode mode = DisplayListManager.getRecordMode();
         if (mode != RecordMode.NONE) {

@@ -197,7 +197,7 @@ tasks.test {
     classpath = archScanAsm + classpath
     javaAgent(glsmMutableStaticsAgent)
     jvmArgs("-Dceleritas.lwjglService=org.taumc.celeritas.lwjgl.HeadlessTestLWJGLService")
-    dependsOn(":glsm:classes", ":lwjgl3-backend:classes", ":sdl-gpu:classes")
+    dependsOn(":glsm:classes", ":lwjgl3-backend:classes", ":sdl-gpu:classes", ":glemu:classes", ":vulkan:classes", ":metal:classes")
 }
 
 val downgradeRootMainClasses = tasks.named<DowngradeFiles>("downgradeMainClasses")
@@ -247,6 +247,23 @@ listOf(tasks.test, glCoreTest).forEach { testTask ->
 tasks.check { dependsOn(verifyTestsRan) }
 
 apply(from = "gradle/angelica-shadow-common.gradle.kts")
+
+// lwjgl3ify ships no lwjgl-vulkan, so the jar carries its own; only the part the Vulkan backend can reach is kept.
+tasks.named<com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar>("shadowJar") {
+    val jar = archiveFile
+    doLast { logger.lifecycle("lwjgl-vulkan: " + JarPruning.pruneUnreachable(jar.get().asFile, "com/gtnewhorizons/angelica/shadow/org/lwjgl/vulkan/")) }
+}
+
+// The native backends need lwjgl3ify, so Java 17 or later; their classes need no Java 8 copy beside the Java 17 one.
+// Java 8 still loads the gates (NativeGate, VulkanGate, MetalGate), which keep theirs: they may reach the rest of glemu,
+// vulkan and metal only from code that runs once a gate is available, which it never is on Java 8.
+tasks.named<xyz.wagyourtail.jvmdg.gradle.task.DowngradeJar>("downgradeJar") {
+    val jar = archiveFile
+    doLast {
+        logger.lifecycle("Native backends: " + JarPruning.dropOldCopies(jar.get().asFile,
+            listOf("com/gtnewhorizons/angelica/glemu/", "com/gtnewhorizons/angelica/vulkan/", "com/gtnewhorizons/angelica/metal/"), 17))
+    }
+}
 apply(from = "experimental-surround/surround.root.gradle.kts")
 
 tasks.withType<TaskPublishCurseForge>().configureEach {

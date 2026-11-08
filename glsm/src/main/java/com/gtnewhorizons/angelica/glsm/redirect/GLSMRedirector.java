@@ -7,6 +7,7 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL12;
+import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.Handle;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.tree.AbstractInsnNode;
@@ -20,9 +21,12 @@ import org.objectweb.asm.tree.MethodInsnNode;
 import org.objectweb.asm.tree.MethodNode;
 import org.objectweb.asm.tree.TypeInsnNode;
 
+import java.io.IOException;
+import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -62,6 +66,7 @@ public class GLSMRedirector {
     );
 
     private static final Set<String> UNMAPPED_SEEN = ConcurrentHashMap.newKeySet();
+    private static final Map<String, Set<String>> OWNER_METHODS = new ConcurrentHashMap<>();
     private static final Set<String> DEBUG_SEEN = ConcurrentHashMap.newKeySet();
 
     private static boolean detectionEnabled() {
@@ -952,6 +957,40 @@ public class GLSMRedirector {
 
     public static String getGLPrefix() { return GL_PREFIX; }
 
+    /** Redirects match by name, and rewriting a call to an overload GLSM lacks would only fail later with NoSuchMethodError. */
+    private static boolean targetHasOverload(String glsmName, String desc) {
+        final Set<String> methods = OWNER_METHODS.computeIfAbsent(getTargetOwner(glsmName), GLSMRedirector::readMethods);
+        final boolean has = methods.isEmpty() || methods.contains(glsmName + desc);
+        if (!has && MISSING_OVERLOADS_WARNED.add(glsmName + desc)) {
+            LOGGER.warn("GLSM has no {}{}; calls to it go straight to the driver, unseen by the state tracking", glsmName, desc);
+        }
+        return has;
+    }
+
+    private static final Set<String> MISSING_OVERLOADS_WARNED = java.util.concurrent.ConcurrentHashMap.newKeySet();
+
+    /** The descriptors of a GLSM method's overloads, read from its class file so that no argument type has to load. */
+    public static List<String> targetOverloads(String glsmName) {
+        final List<String> out = new ArrayList<>();
+        for (String method : OWNER_METHODS.computeIfAbsent(getTargetOwner(glsmName), GLSMRedirector::readMethods)) {
+            if (method.startsWith(glsmName + "(")) out.add(method.substring(glsmName.length()));
+        }
+        return out;
+    }
+
+    private static Set<String> readMethods(String owner) {
+        final Set<String> methods = new HashSet<>();
+        try (InputStream in = GLSMRedirector.class.getClassLoader().getResourceAsStream(owner + ".class")) {
+            if (in == null) return methods;
+            final ClassNode cn = new ClassNode();
+            new ClassReader(in).accept(cn, ClassReader.SKIP_CODE | ClassReader.SKIP_DEBUG | ClassReader.SKIP_FRAMES);
+            for (Object m : cn.methods) methods.add(((MethodNode) m).name + ((MethodNode) m).desc);
+        } catch (IOException | RuntimeException e) {
+            LOGGER.warn("Could not read {}", owner, e);
+        }
+        return methods;
+    }
+
     public static String getTargetOwner(String glsmName) { return methodOwner.getOrDefault(glsmName, GLStateManager); }
 
     public static List<String> glsmClasses() {
@@ -1127,6 +1166,7 @@ public class GLSMRedirector {
                             final Map<String, String> redirects = mNode.owner.startsWith(GL_PREFIX) ? glMethodRedirects : methodRedirects.get(mNode.owner);
                             glsmName = redirects != null ? redirects.get(mNode.name) : null;
                         }
+                        if (glsmName != null && !targetHasOverload(glsmName, mNode.desc)) glsmName = null;
                         final String awareOwner = lwjgl3Aware ? awareOwnerRedirects.get(mNode.owner + " " + mNode.name + mNode.desc) : null;
                         if (awareOwner != null) {
                             if (LOG_SPAM) {
@@ -1180,6 +1220,7 @@ public class GLSMRedirector {
                             final Map<String, String> redirects = handle.getOwner().startsWith(GL_PREFIX) ? glMethodRedirects : methodRedirects.get(handle.getOwner());
                             glsmName = redirects != null ? redirects.get(handle.getName()) : null;
                         }
+                        if (glsmName != null && !targetHasOverload(glsmName, handle.getDesc())) glsmName = null;
                         if (glsmName == null) {
                             if (isDebugCall(handle.getOwner(), handle.getName())) {
                                 reportDebugPassthrough(transformedName, handle.getOwner(), handle.getName(), handle.getDesc());

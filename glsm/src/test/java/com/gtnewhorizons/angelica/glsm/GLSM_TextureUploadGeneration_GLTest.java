@@ -23,14 +23,15 @@ public class GLSM_TextureUploadGeneration_GLTest {
     }
 
     @Test
-    void aLevelBeyondTheShiftWidthClampsToOne() {
+    void aLevelThatWasNeverDefinedHasNoSize() {
         final int texId = allocate(64);
         try {
             assertEquals(64, GLSMTextures.glGetTexLevelParameteri(GL11.GL_TEXTURE_2D, 0, GL11.GL_TEXTURE_WIDTH));
-            assertEquals(1, GLSMTextures.glGetTexLevelParameteri(GL11.GL_TEXTURE_2D, 6, GL11.GL_TEXTURE_WIDTH));
-            assertEquals(1, GLSMTextures.glGetTexLevelParameteri(GL11.GL_TEXTURE_2D, 31, GL11.GL_TEXTURE_WIDTH));
-            assertEquals(1, GLSMTextures.glGetTexLevelParameteri(GL11.GL_TEXTURE_2D, 32, GL11.GL_TEXTURE_WIDTH));
-            assertEquals(1, GLSMTextures.glGetTexLevelParameteri(GL11.GL_TEXTURE_2D, 64, GL11.GL_TEXTURE_HEIGHT));
+            assertEquals(0, GLSMTextures.glGetTexLevelParameteri(GL11.GL_TEXTURE_2D, 6, GL11.GL_TEXTURE_WIDTH));
+            assertEquals(0, GLSMTextures.glGetTexLevelParameteri(GL11.GL_TEXTURE_2D, 31, GL11.GL_TEXTURE_WIDTH));
+            assertEquals(0, GLSMTextures.glGetTexLevelParameteri(GL11.GL_TEXTURE_2D, 32, GL11.GL_TEXTURE_WIDTH));
+            assertEquals(0, GLSMTextures.glGetTexLevelParameteri(GL11.GL_TEXTURE_2D, 64, GL11.GL_TEXTURE_HEIGHT));
+            GL11.glGetError();
         } finally {
             GLSMTextures.glBindTexture(GL11.GL_TEXTURE_2D, 0);
             GLSMTextures.glDeleteTextures(texId);

@@ -92,6 +92,8 @@ public class GLSM_ServerSideState_UnitTest {
                         if (pendingCommand != null && !shutdownRequested) {
                             try {
                                 pendingCommand.run();
+                                // Objects made on one context reach the other only once it flushes.
+                                GL11.glFlush();
                             } catch (Throwable t) {
                                 backgroundError = t;
                             }
@@ -161,6 +163,9 @@ public class GLSM_ServerSideState_UnitTest {
         readyLatch = new CountDownLatch(1);
         commandLatch = new CountDownLatch(1);
         completeLatch = new CountDownLatch(1);
+
+        // The worker's context must see what this thread has just created.
+        GL11.glFlush();
 
         // Set command and signal
         pendingCommand = command;

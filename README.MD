@@ -11,7 +11,7 @@
 * Shaders - Iris backport & enhancements
 * Terrain - Celeritas 2.5.12 with threaded chunk building and translucency sorting
 * GL 3.3 core profile with Java based fixed function pipeline emulation
-* Renderer selection - OpenGL, or SDL GPU for Vulkan/Metal/Direct3D 12
+* Renderer selection - OpenGL, SDL GPU, or Native Vulkan/Metal
 * Batching and instancing for entities, tile entities, items, particles and weather
 * Dynamic lights
 * HUD caching
@@ -25,13 +25,22 @@
    * Complementary + Euphoria Patches is the primary compatibility target
    * Sildurs, Seus, and any other shaders might work
 * SDL GPU renderer - Experimental
+* Native Vulkan / Metal renderer - Experimental
 * MCPatcher features - Alpha
 * HUD caching - Semi-stable
 
 ## SDL GPU renderer
 Optional, OpenGL is the default
+* Needs `-Dangelica.experimentalBackends=true` or `-Dangelica.sdlgpu.enable=true`
 * Vulkan, Metal (macOS) and Direct3D 12 (Windows) through SDL3
 * Needs [LWJGL3ify](https://github.com/GTNewHorizons/lwjgl3ify/releases/) 3.0.25+
+* Falls back to OpenGL when no device can be created
+* Vulkan on macOS via MoltenVK from the optional `angelica-moltenvk` jar
+
+## Native renderer
+Optional, OpenGL is the default
+* Vulkan, and Metal (macOS) with `-Dangelica.experimentalBackends=true`
+* Needs [LWJGL3ify](https://github.com/GTNewHorizons/lwjgl3ify/releases/) 3.0.31+
 * Falls back to OpenGL when no device can be created
 * Vulkan on macOS via MoltenVK from the optional `angelica-moltenvk` jar
 
@@ -50,7 +59,7 @@ Targets GL 3.3+ core profile
 * NOTE: Some mods are not required, but a specific version is required if present - see: `Minimum versions` below.
 
 # Minimum versions (if present)
-* [LWJGL3ify](https://github.com/GTNewHorizons/lwjgl3ify/releases/) 1.5.3+ (3.0.25+ for the SDL GPU renderer)
+* [LWJGL3ify](https://github.com/GTNewHorizons/lwjgl3ify/releases/) 1.5.3+ (3.0.25+ for the SDL GPU renderer, 3.0.31+ for the native renderer)
 * [Hodgepodge](https://github.com/GTNewHorizons/Hodgepodge/releases) 2.4.4+
 * [ArchaicFix](https://www.curseforge.com/minecraft/mc-mods/archaicfix/files/all?page=1&pageSize=20) 0.7.0+
 * [CodeChickenCore](https://github.com/GTNewHorizons/CodeChickenCore/releases) 1.2.0+ - Threading issues below that
@@ -79,7 +88,7 @@ Targets GL 3.3+ core profile
 
 # Building
 * `./gradlew build`, `./gradlew test`
-* Subprojects: `glsm` (state manager, FFP emulation, backends), `lwjgl3-backend`, `sdl-gpu`, `tracy-client`, `moltenvk`
+* Subprojects: `glsm` (state manager, FFP emulation, backends), `lwjgl3-backend`, `glemu`, `vulkan`, `metal`, `sdl-gpu`, `tracy-client`, `moltenvk`
 * Read the [AI policy](AI_POLICY.md) before opening a PR
 
 # Credits

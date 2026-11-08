@@ -47,6 +47,7 @@ public final class GLSMFramebuffer {
     }
 
     public static void glDrawBuffer(int mode) {
+        if (!RENDER_BACKEND.checks().drawBuffer(mode)) return;
         rejectExitCapture();
         final RecordMode recordMode = DisplayListManager.getRecordMode();
         if (recordMode != RecordMode.NONE) {
@@ -119,8 +120,10 @@ public final class GLSMFramebuffer {
 
     public static void glReadBuffer(int mode) {
         rejectExitCapture();
-        if (DisplayListManager.isRecording()) {
-            throw DisplayListManager.unsupportedInList("glReadBuffer");
+        final RecordMode recording = DisplayListManager.getRecordMode();
+        if (recording != RecordMode.NONE) {
+            DisplayListManager.recordReadBuffer(mode);
+            if (recording == RecordMode.COMPILE) return;
         }
         RENDER_BACKEND.readBuffer(mode);
     }
@@ -134,7 +137,10 @@ public final class GLSMFramebuffer {
             }
         }
         beforeUncapturedStateChange();
-        RENDER_BACKEND.drawBuffers(buffer);
+        final IntBuffer one = ctx().oneDrawBuffer;
+        one.clear();
+        one.put(0, buffer);
+        RENDER_BACKEND.drawBuffers(one);
     }
 
     public static void glDrawBuffers(IntBuffer bufs) {
@@ -147,6 +153,12 @@ public final class GLSMFramebuffer {
         }
         beforeUncapturedStateChange();
         RENDER_BACKEND.drawBuffers(bufs);
+    }
+
+    public static void glDrawBuffers(int[] bufs) {
+        final IntBuffer list = org.lwjgl.BufferUtils.createIntBuffer(bufs.length).put(bufs);
+        list.flip();
+        glDrawBuffers(list);
     }
     public static boolean glIsFramebuffer(int framebuffer) { rejectExitCapture(); return RENDER_BACKEND.isFramebuffer(framebuffer); }
     public static boolean glIsRenderbuffer(int renderbuffer) { rejectExitCapture(); return RENDER_BACKEND.isRenderbuffer(renderbuffer); }
@@ -201,6 +213,7 @@ public final class GLSMFramebuffer {
     }
 
     public static int glGetFramebufferAttachmentParameteri(int target, int attachment, int pname) {
+        if (!RENDER_BACKEND.checks().glGetFramebufferAttachmentParameteriv(target, attachment, pname)) return 0;
         rejectExitCapture();
         return RENDER_BACKEND.getFramebufferAttachmentParameteri(target, attachment, pname);
     }
@@ -254,12 +267,14 @@ public final class GLSMFramebuffer {
     }
 
     public static void glNamedFramebufferTextureLayer(int framebuffer, int attachment, int texture, int level, int layer) {
+        if (!RENDER_BACKEND.checks().namedFramebufferTextureLayer(framebuffer, attachment, texture, level, layer)) return;
         final int previous = swapDrawFramebuffer(framebuffer);
         glFramebufferTextureLayer(GL30.GL_DRAW_FRAMEBUFFER, attachment, texture, level, layer);
         swapDrawFramebuffer(previous);
     }
 
     public static void glNamedFramebufferRenderbuffer(int framebuffer, int attachment, int renderbuffertarget, int renderbuffer) {
+        if (!RENDER_BACKEND.checks().namedFramebufferRenderbuffer(framebuffer, attachment, renderbuffertarget, renderbuffer)) return;
         final int previous = swapDrawFramebuffer(framebuffer);
         glFramebufferRenderbuffer(GL30.GL_DRAW_FRAMEBUFFER, attachment, renderbuffertarget, renderbuffer);
         swapDrawFramebuffer(previous);

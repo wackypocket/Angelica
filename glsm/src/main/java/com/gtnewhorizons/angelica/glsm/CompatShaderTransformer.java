@@ -412,12 +412,17 @@ public class CompatShaderTransformer {
 
     private record FFPInputs(boolean position, boolean color, boolean uv0, boolean uv1, boolean normal) {
         static FFPInputs detect(String source) {
+            // Whole names: gl_VertexID is not gl_Vertex, nor gl_NormalMatrix gl_Normal.
             return new FFPInputs(
-                source.contains("gl_Vertex") || source.contains("ftransform"),
-                source.contains("gl_Color"),
-                source.contains("gl_MultiTexCoord0"),
-                source.contains("gl_MultiTexCoord1"),
-                source.contains("gl_Normal"));
+                names(source, "gl_Vertex") || source.contains("ftransform"),
+                names(source, "gl_Color"),
+                names(source, "gl_MultiTexCoord0"),
+                names(source, "gl_MultiTexCoord1"),
+                names(source, "gl_Normal"));
+        }
+
+        private static boolean names(String source, String name) {
+            return java.util.regex.Pattern.compile("\\b" + name + "\\b").matcher(source).find();
         }
     }
 

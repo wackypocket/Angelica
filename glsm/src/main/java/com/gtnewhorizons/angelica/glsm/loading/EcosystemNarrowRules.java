@@ -98,6 +98,9 @@ public final class EcosystemNarrowRules {
         "org.taumc.celeritas",
         "com.gtnewhorizons.angelica.lwjgl3",
         "com.gtnewhorizons.angelica.sdlgpu",
+        "com.gtnewhorizons.angelica.glemu",
+        "com.gtnewhorizons.angelica.vulkan",
+        "com.gtnewhorizons.angelica.metal",
     };
 
     public static final String[] EARLY_REDIRECTOR_TARGETS = {

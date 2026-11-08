@@ -13,10 +13,10 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 class QuadConverterTest {
 
     @Test
-    void triangulateQuads_ubyteToUint_lastVertexConvention() {
-        // 2 quads: [0,1,2,3] and [4,5,6,7]. Expected LAST-convention output:
-        //   quad0 → (0,1,3), (1,2,3)
-        //   quad1 → (4,5,7), (5,6,7)
+    void triangulateQuads_ubyteToUint_splitsAlongV0V2() {
+        // 2 quads: [0,1,2,3] and [4,5,6,7], split as drivers and display lists do:
+        //   quad0 → (0,1,2), (2,3,0)
+        //   quad1 → (4,5,6), (6,7,4)
         final ByteBuffer src = MemoryUtilities.memAlloc(8);
         for (int i = 0; i < 8; i++) src.put(i, (byte) i);
 
@@ -24,7 +24,7 @@ class QuadConverterTest {
         try {
             QuadConverter.triangulateQuads(memAddress0(src), GL11.GL_UNSIGNED_BYTE, memAddress0(dst), GL11.GL_UNSIGNED_INT, 2);
 
-            assertUintIndices(dst, 0, 1, 3, 1, 2, 3, 4, 5, 7, 5, 6, 7);
+            assertUintIndices(dst, 0, 1, 2, 2, 3, 0, 4, 5, 6, 6, 7, 4);
         } finally {
             MemoryUtilities.memFree(src);
             MemoryUtilities.memFree(dst);
@@ -41,7 +41,7 @@ class QuadConverterTest {
         try {
             QuadConverter.triangulateQuads(memAddress0(src), GL11.GL_UNSIGNED_SHORT, memAddress0(dst), GL11.GL_UNSIGNED_SHORT, 1);
 
-            assertUshortIndices(dst, 100, 101, 103, 101, 102, 103);
+            assertUshortIndices(dst, 100, 101, 102, 102, 103, 100);
         } finally {
             MemoryUtilities.memFree(src);
             MemoryUtilities.memFree(dst);
@@ -57,8 +57,8 @@ class QuadConverterTest {
         try {
             QuadConverter.triangulateQuads(memAddress0(src), GL11.GL_UNSIGNED_SHORT, memAddress0(dst), GL11.GL_UNSIGNED_INT, 1);
 
-            // Zero-extended USHORT→UINT, LAST winding.
-            assertUintIndices(dst, 0xFF00, 0xFF01, 0xFF03, 0xFF01, 0xFF02, 0xFF03);
+            // Zero-extended USHORT→UINT.
+            assertUintIndices(dst, 0xFF00, 0xFF01, 0xFF02, 0xFF02, 0xFF03, 0xFF00);
         } finally {
             MemoryUtilities.memFree(src);
             MemoryUtilities.memFree(dst);
@@ -74,7 +74,22 @@ class QuadConverterTest {
         try {
             QuadConverter.triangulateQuads(memAddress0(src), GL11.GL_UNSIGNED_INT, memAddress0(dst), GL11.GL_UNSIGNED_INT, 1);
 
-            assertUintIndices(dst, 1_000_000, 1_000_001, 1_000_003, 1_000_001, 1_000_002, 1_000_003);
+            assertUintIndices(dst, 1_000_000, 1_000_001, 1_000_002, 1_000_002, 1_000_003, 1_000_000);
+        } finally {
+            MemoryUtilities.memFree(src);
+            MemoryUtilities.memFree(dst);
+        }
+    }
+
+    @Test
+    void triangulateQuads_flatShadingKeepsV3InBothTriangles() {
+        // GL_FLAT takes a quad's colour from v3, the last vertex of both triangles here.
+        final ByteBuffer src = MemoryUtilities.memAlloc(4);
+        for (int i = 0; i < 4; i++) src.put(i, (byte) i);
+        final ByteBuffer dst = MemoryUtilities.memAlloc(6 * 4);
+        try {
+            QuadConverter.triangulateQuads(memAddress0(src), GL11.GL_UNSIGNED_BYTE, memAddress0(dst), GL11.GL_UNSIGNED_INT, 1, 0, QuadConverter.FLAT);
+            assertUintIndices(dst, 0, 1, 3, 1, 2, 3);
         } finally {
             MemoryUtilities.memFree(src);
             MemoryUtilities.memFree(dst);

@@ -121,7 +121,8 @@ public class RenderSystem {
         }
 
         supportsCompute = supportsCompute();
-        supportsTesselation = GLStateManager.capabilities.GL_ARB_tessellation_shader || GLStateManager.capabilities.OpenGL40;
+        // An emulated backend claims 4.6 whatever stages it has, so only the extension says whether it can tessellate.
+        supportsTesselation = GLStateManager.capabilities.GL_ARB_tessellation_shader || GLStateManager.capabilities.OpenGL40 && !RENDER_BACKEND.emulatesGL();
 
         supportsImageLoadStore = GLStateManager.capabilities.OpenGL42
                 || GLStateManager.capabilities.GL_ARB_shader_image_load_store

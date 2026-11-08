@@ -15,6 +15,8 @@ import com.gtnewhorizons.angelica.glsm.hooks.GLSMHooks;
 import com.gtnewhorizons.angelica.glsm.hooks.GLSMInitConfig;
 import com.gtnewhorizons.angelica.proxy.ClientProxy;
 import com.gtnewhorizons.angelica.render.SelectionBoxRenderer;
+import com.gtnewhorizons.angelica.glemu.NativeGate;
+import com.gtnewhorizons.angelica.loading.NativeGates;
 import com.gtnewhorizons.angelica.sdlgpu.SDLGPUGate;
 import org.embeddedt.embeddium.impl.gl.debug.GLDebug;
 import net.minecraft.client.Minecraft;
@@ -29,9 +31,10 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 public class MixinInitGLStateManager {
 
     @Inject(method = "initializeTextures", at = @At("HEAD"))
-    private static void angelica$installSDLDrawable(CallbackInfo ci) {
+    private static void angelica$installBackendDrawables(CallbackInfo ci) {
         GLSMConfig.workerThreadCount = AngelicaConfig.workerThreadCount;
         SDLGPUGate.ensureDrawableInstalled();
+        NativeGates.ALL.forEach(NativeGate::ensureDrawableInstalled);
     }
 
     @Inject(method = "initializeTextures", at = @At("RETURN"))

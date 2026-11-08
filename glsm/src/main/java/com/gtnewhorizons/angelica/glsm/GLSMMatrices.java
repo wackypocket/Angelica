@@ -16,6 +16,7 @@ import java.nio.DoubleBuffer;
 import java.nio.FloatBuffer;
 import java.nio.IntBuffer;
 
+import static com.gtnewhorizons.angelica.glsm.GLStateManager.recordError;
 import static com.gtnewhorizons.angelica.glsm.GLStateManager.LOGGER;
 import static com.gtnewhorizons.angelica.glsm.GLStateManager.beforeUncapturedStateChange;
 import static com.gtnewhorizons.angelica.glsm.GLStateManager.ctx;
@@ -61,6 +62,10 @@ public final class GLSMMatrices {
     }
 
     public static void glMatrixMode(int mode) {
+        if (mode != GL11.GL_MODELVIEW && mode != GL11.GL_PROJECTION && mode != GL11.GL_TEXTURE && mode != GL11.GL_COLOR) {
+            recordError(GL11.GL_INVALID_ENUM);
+            return;
+        }
         final GLContextState glCtx = ctx();
         glCtx.exitCapture.write(ExitStateCapture.MATRIX_MODE);
         final RecordMode recordMode = DisplayListManager.getRecordMode();
@@ -341,6 +346,10 @@ public final class GLSMMatrices {
             DisplayListManager.updateRelativeTransformOrtho(left, right, bottom, top, zNear, zFar);
             return;
         }
+        if (left == right || bottom == top || zNear == zFar) {
+            recordError(GL11.GL_INVALID_VALUE);
+            return;
+        }
         if (isCachingEnabled()) {
             matrixStack(glCtx).ortho((float) left, (float) right, (float) bottom, (float) top, (float) zNear, (float) zFar);
             bumpMatrixGeneration(glCtx);
@@ -352,6 +361,10 @@ public final class GLSMMatrices {
         beforeMatrixChange(glCtx);
         if (DisplayListManager.isRecording()) {
             DisplayListManager.updateRelativeTransformFrustum(left, right, bottom, top, zNear, zFar);
+            return;
+        }
+        if (zNear <= 0 || zFar <= 0 || left == right || bottom == top || zNear == zFar) {
+            recordError(GL11.GL_INVALID_VALUE);
             return;
         }
         if (isCachingEnabled()) {
@@ -376,6 +389,7 @@ public final class GLSMMatrices {
                 matrixStack(glCtx).pushMatrix();
             } catch (IllegalStateException ignored) {
                 glCtx.exitCapture.reject();
+                recordError(GL11.GL_STACK_OVERFLOW);
                 if (initConfig != null && initConfig.isLwjglDebug()) LOGGER.warn("Matrix stack overflow ", new Throwable());
             }
         }
@@ -399,6 +413,7 @@ public final class GLSMMatrices {
                 bumpMatrixGeneration(glCtx);
             } catch (IllegalStateException ignored) {
                 glCtx.exitCapture.reject();
+                recordError(GL11.GL_STACK_UNDERFLOW);
                 if (initConfig != null && initConfig.isLwjglDebug()) LOGGER.warn("Matrix stack underflow ", new Throwable());
             }
         }

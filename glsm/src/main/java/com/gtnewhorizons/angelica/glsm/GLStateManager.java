@@ -4,6 +4,7 @@ import com.gtnewhorizon.gtnhlib.client.renderer.stacks.IStateStack;
 import com.gtnewhorizons.angelica.config.SystemProperties;
 import com.gtnewhorizons.angelica.glsm.DisplayListManager.RecordMode;
 import com.gtnewhorizons.angelica.glsm.backend.BackendManager;
+import com.gtnewhorizons.angelica.glsm.backend.GlCallLog;
 import com.gtnewhorizons.angelica.glsm.backend.VSyncMode;
 import com.gtnewhorizons.angelica.glsm.ffp.VAOManager;
 import com.gtnewhorizons.angelica.glsm.ffp.VertexKey;
@@ -90,6 +91,13 @@ public class GLStateManager {
         if (!ExitStateCapture.anyOpen()) return;
         if (unit == 0) ctx().exitCapture.write(ExitStateCapture.TEXCOORD);
         else ctx().exitCapture.reject();
+    }
+
+    /** For calls the backend never sees. Like GL, the first error stays until glGetError reads it. */
+    static void recordError(int error) {
+        if (GlCallLog.ENABLED) GlCallLog.refusal(error);
+        final GLContextState glCtx = ctx();
+        if (glCtx.pendingError == GL11.GL_NO_ERROR) glCtx.pendingError = error;
     }
 
     static void rejectExitCapture() {
@@ -277,7 +285,8 @@ public class GLStateManager {
     public static final int MAX_TEXTURE_STACK_DEPTH = 4;
     public static final int MAX_CLIP_PLANES = 8;
     public static final int INDEXED_BUFFER_SLOTS = 64;
-    public static final int MAX_TEXTURE_UNITS = RENDER_BACKEND.getInteger(GL20.GL_MAX_TEXTURE_IMAGE_UNITS);
+    /** glActiveTexture accepts any combined texture image unit; tracking stops at 96. */
+    public static final int MAX_TEXTURE_UNITS = Math.min(96, RENDER_BACKEND.getInteger(GL20.GL_MAX_COMBINED_TEXTURE_IMAGE_UNITS));
     public static final int MAX_LEGACY_TEXTURE_UNITS = Math.min(VertexKey.MAX_UNITS, MAX_TEXTURE_UNITS);
     public static final int MAX_TEXTURE_COORDS = Math.min(VAOManager.TEX_COORD_UNITS, MAX_TEXTURE_UNITS);
 
@@ -431,6 +440,12 @@ public class GLStateManager {
             .addFeature(GL11.GL_MAP2_GRID_SEGMENTS)
             .addFeature(GL11.GL_MAX_VIEWPORT_DIMS)
             .addFeature(GL11.GL_MODELVIEW_MATRIX)
+            .addFeature(GL13.GL_TRANSPOSE_MODELVIEW_MATRIX)
+            .addFeature(GL13.GL_TRANSPOSE_PROJECTION_MATRIX)
+            .addFeature(GL13.GL_TRANSPOSE_TEXTURE_MATRIX)
+            .addFeature(0x845F) // GL_CURRENT_RASTER_SECONDARY_COLOR
+            .addFeature(org.lwjgl.opengl.GL12.GL_ALIASED_POINT_SIZE_RANGE)
+            .addFeature(org.lwjgl.opengl.GL12.GL_ALIASED_LINE_WIDTH_RANGE)
             .addFeature(GL11.GL_POINT_SIZE_RANGE)
             .addFeature(GL11.GL_POLYGON_MODE)
             .addFeature(GL11.GL_PROJECTION_MATRIX)
@@ -658,10 +673,6 @@ public class GLStateManager {
         return RENDER_BACKEND.supportsVSyncMode(mode);
     }
 
-    public static VSyncMode preferredTearFreeMode() {
-        return RENDER_BACKEND.preferredTearFreeMode();
-    }
-
     public static String getRenderBackendName() {
         return RENDER_BACKEND.getName();
     }
@@ -680,6 +691,22 @@ public class GLStateManager {
 
     public static void pumpDisplayMessages() {
         RENDER_BACKEND.pumpDisplayMessages();
+    }
+
+    public static boolean tracksWindowFullscreen() {
+        return RENDER_BACKEND.tracksWindowFullscreen();
+    }
+
+    public static boolean isWindowFullscreen() {
+        return RENDER_BACKEND.isWindowFullscreen();
+    }
+
+    public static void saveWindowedBounds() {
+        RENDER_BACKEND.saveWindowedBounds();
+    }
+
+    public static void restoreWindowedBounds() {
+        RENDER_BACKEND.restoreWindowedBounds();
     }
 
     public static boolean vendorIsAMD() {

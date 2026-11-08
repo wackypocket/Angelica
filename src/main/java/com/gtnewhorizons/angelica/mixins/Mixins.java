@@ -8,8 +8,9 @@ import com.gtnewhorizons.angelica.config.AngelicaConfig;
 import com.gtnewhorizons.angelica.config.CompatConfig;
 import com.gtnewhorizons.angelica.config.SystemProperties;
 import com.gtnewhorizons.angelica.glsm.CaptureGate;
-import com.gtnewhorizons.angelica.glsm.backend.BackendOptions;
 import com.gtnewhorizons.angelica.glsm.profiling.TracyOptions;
+import com.gtnewhorizons.angelica.glsm.backend.BackendOptions;
+import com.gtnewhorizons.angelica.loading.NativeGates;
 import com.gtnewhorizons.angelica.sdlgpu.SDLGPUGate;
 import jss.notfine.config.MCPatcherForgeConfig;
 import jss.notfine.config.NotFineConfig;
@@ -27,6 +28,7 @@ public enum Mixins implements IMixins {
         .setPhase(Phase.EARLY)
         .addClientMixins(
             "angelica.startup.MixinInitGLStateManager"
+            , "angelica.startup.MixinSplashProgressEventPump"
         )
     ),
 
@@ -139,6 +141,15 @@ public enum Mixins implements IMixins {
         .addClientMixins(
             "sdlgpu.MixinForgeHooksClient_SDLGPUDisplay",
             "sdlgpu.MixinMinecraft_SDLGPUIcons"
+        )
+    ),
+
+    ANGELICA_NATIVE_DISPLAY(new MixinBuilder("Native backend Display.create path")
+        .setPhase(Phase.EARLY)
+        .setApplyIf(() -> NativeGates.windowOwner() != null)
+        .addClientMixins(
+            "nativegl.MixinForgeHooksClient_NativeDisplay",
+            "nativegl.MixinMinecraft_NativeIcons"
         )
     ),
 
@@ -261,7 +272,6 @@ public enum Mixins implements IMixins {
             "angelica.textures.MixinTextureMap_ParallelLoad"
         )
     ),
-
 
     THAUMCRAFT_SCANNER_SCREEN(new MixinBuilder("Render the held Thaumometer screen after world transparency")
         .setPhase(Phase.LATE)
@@ -695,6 +705,13 @@ public enum Mixins implements IMixins {
         .addExcludedMod(TargetedMod.LUMI)
         .setApplyIf(() -> AngelicaConfig.optimizeWorldUpdateLight)
         .addCommonMixins("angelica.lighting.MixinWorld_FixLightUpdateLag")),
+
+    CLIENT_RELIGHT_BUDGET(new MixinBuilder("Spread the client's lighting re-checks over ticks instead of stalling a frame")
+        .setPhase(Phase.EARLY)
+        .addExcludedMod(TargetedMod.ARCHAICFIX)
+        .addExcludedMod(TargetedMod.SUPERNOVA)
+        .addExcludedMod(TargetedMod.LUMI)
+        .addClientMixins("angelica.lighting.MixinChunk_RelightBudget", "angelica.lighting.MixinWorldClient_RelightBudget")),
 
     TESR_LIGHT_CACHE(new MixinBuilder("Cache the tile-entity dispatcher's per-tile lightmap lookup for one tick")
         .setPhase(Phase.EARLY)

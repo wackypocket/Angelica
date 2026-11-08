@@ -2,6 +2,8 @@ package net.coderbot.iris.gl.program;
 
 import com.gtnewhorizons.angelica.glsm.GLSMPrograms;
 import org.jetbrains.annotations.Nullable;
+import org.lwjgl.opengl.GL11;
+import org.lwjgl.opengl.GL20;
 
 import java.util.ArrayDeque;
 import java.util.HashMap;
@@ -31,6 +33,11 @@ public final class RetainedPrograms {
 	}
 
 	static void retain(Sources sources, int program) {
+		// A backend compiling after link can fail a program that looked linked when it was built.
+		if (GLSMPrograms.glGetProgrami(program, GL20.GL_LINK_STATUS) == GL11.GL_FALSE) {
+			GLSMPrograms.glDeleteProgram(program);
+			return;
+		}
 		recent.computeIfAbsent(sources, key -> new ArrayDeque<>()).add(program);
 	}
 

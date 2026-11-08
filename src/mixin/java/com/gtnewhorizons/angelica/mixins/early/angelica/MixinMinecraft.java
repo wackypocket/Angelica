@@ -22,6 +22,7 @@ import org.embeddedt.embeddium.impl.render.frame.RenderAheadManager;
 import org.lwjgl.input.Keyboard;
 import com.gtnewhorizons.angelica.glsm.GLSMEnable;
 import com.gtnewhorizons.angelica.glsm.GLStateManager;
+import org.lwjgl.opengl.Display;
 import org.lwjgl.opengl.GL11;
 import org.objectweb.asm.Opcodes;
 import org.spongepowered.asm.mixin.Mixin;
@@ -34,6 +35,14 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 @Mixin(Minecraft.class)
 public abstract class MixinMinecraft {
+
+    @Shadow public int displayWidth;
+    @Shadow public int displayHeight;
+    @Shadow public boolean fullscreen;
+
+    @Shadow
+    private void resize(int width, int height) {}
+
     @Shadow
     public GameSettings gameSettings;
 
@@ -48,6 +57,24 @@ public abstract class MixinMinecraft {
 
     @Unique
     private static boolean angelica$hadWorld;
+
+    @Unique
+    private static final long angelica$TOGGLE_SETTLE_NANOS = 2_000_000_000L;
+
+    @Unique
+    private static final long angelica$SETTLE_POLL_NANOS = 100_000_000L;
+
+    @Unique
+    private int angelica$windowX = Integer.MIN_VALUE, angelica$windowY, angelica$windowW, angelica$windowH;
+
+    @Unique
+    private boolean angelica$toggleSettling;
+
+    @Unique
+    private long angelica$toggleSettleDeadline;
+
+    @Unique
+    private long angelica$nextSettlePoll;
 
     @Unique private static final Tracy.ZoneId angelica$Z_STREAMING_END_FRAME = Tracy.zoneId("streamingEndFrame", Tracy.COLOR_CLIENT);
 
@@ -99,6 +126,85 @@ public abstract class MixinMinecraft {
     @Redirect(method = {"startGame", "toggleFullscreen"}, at = @At(value = "INVOKE", target = "Lorg/lwjgl/opengl/Display;setVSyncEnabled(Z)V", remap = false))
     private void angelica$redirectVSync(boolean sync) {
         GLStateManager.setVSyncEnabled(sync);
+    }
+
+    @Inject(method = "startGame", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/renderer/OpenGlHelper;initializeTextures()V"))
+    private void angelica$adoptWindowSizeAfterDisplayCreate(CallbackInfo ci) {
+        if (!GLStateManager.tracksWindowFullscreen() || !Display.isCreated()) return;
+        final int w = Display.getWidth(), h = Display.getHeight();
+        if (w > 1 && h > 1) {
+            this.displayWidth = w;
+            this.displayHeight = h;
+        }
+    }
+
+    @Inject(method = "toggleFullscreen", at = @At("HEAD"))
+    private void angelica$saveWindowedBounds(CallbackInfo ci) {
+        if (!this.fullscreen) GLStateManager.saveWindowedBounds();
+    }
+
+    @Inject(method = "toggleFullscreen", at = @At("RETURN"))
+    private void angelica$afterToggleFullscreen(CallbackInfo ci) {
+        if (!this.fullscreen) GLStateManager.restoreWindowedBounds();
+        // On backends tracking the window the settings show the window's state, but only a choice made in the settings is saved for the next boot.
+        if (GLStateManager.tracksWindowFullscreen()) {
+            ((IGameSettingsExt) this.gameSettings).angelica$followWindowFullscreen(this.fullscreen);
+            angelica$toggleSettling = true;
+            angelica$toggleSettleDeadline = System.nanoTime() + angelica$TOGGLE_SETTLE_NANOS;
+            angelica$nextSettlePoll = 0L;
+            if (Display.isCreated()) angelica$adoptDisplaySize();
+        }
+    }
+
+    // Backends tracking the SDL window report fullscreen themselves; vanilla's toggle on focus loss would fight the OS.
+    @WrapWithCondition(method = "runGameLoop", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/Minecraft;toggleFullscreen()V"))
+    private boolean angelica$keepDesktopFullscreenOnFocusLoss(Minecraft mc) {
+        return !GLStateManager.tracksWindowFullscreen();
+    }
+
+    @Inject(method = "runGameLoop", at = @At("HEAD"))
+    private void angelica$resyncWindow(CallbackInfo ci) {
+        if (!GLStateManager.tracksWindowFullscreen() || !Display.isCreated()) return;
+        angelica$trackWindowFullscreen();
+        angelica$adoptDisplaySize();
+    }
+
+    @Unique
+    private void angelica$trackWindowFullscreen() {
+        final int x = Display.getX(), y = Display.getY(), w = Display.getWidth(), h = Display.getHeight();
+        final boolean changed = x != angelica$windowX || y != angelica$windowY || w != angelica$windowW || h != angelica$windowH;
+        if (!changed && !angelica$toggleSettling) return;
+        // While a toggle settles the window is asked at most ten times a second; each ask can be a main-thread round trip.
+        if (!changed) {
+            final long now = System.nanoTime();
+            if (now - angelica$nextSettlePoll < 0L) return;
+            angelica$nextSettlePoll = now + angelica$SETTLE_POLL_NANOS;
+        }
+        angelica$windowX = x;
+        angelica$windowY = y;
+        angelica$windowW = w;
+        angelica$windowH = h;
+        final boolean actual = GLStateManager.isWindowFullscreen();
+        // The OS keeps reporting the old state for a while after a toggle, so the window is trusted once it agrees or the settle time passes.
+        if (angelica$toggleSettling) {
+            if (actual != this.fullscreen && System.nanoTime() - angelica$toggleSettleDeadline < 0L) return;
+            angelica$toggleSettling = false;
+        }
+        if (actual != this.fullscreen) {
+            this.fullscreen = actual;
+            ((IGameSettingsExt) this.gameSettings).angelica$followWindowFullscreen(actual);
+        }
+        if (!actual) GLStateManager.saveWindowedBounds();
+    }
+
+    @Unique
+    private void angelica$adoptDisplaySize() {
+        final int w = Display.getWidth(), h = Display.getHeight();
+        if (w > 1 && h > 1 && (w != this.displayWidth || h != this.displayHeight)) {
+            this.displayWidth = w;
+            this.displayHeight = h;
+            this.resize(w, h);
+        }
     }
 
     @Inject(method = "startGame", at = @At("RETURN"))

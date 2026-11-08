@@ -18,6 +18,7 @@ public final class SystemProperties {
     // Backend selection
     public static final String KEY_USE_SDL_GPU = "angelica.sdlgpu.enable";
     public static final Boolean SDL_GPU_OVERRIDE = parseBooleanOverride(KEY_USE_SDL_GPU);
+    public static final boolean EXPERIMENTAL_BACKENDS = Boolean.getBoolean("angelica.experimentalBackends");
     public static final String GL_PROFILE = System.getProperty("angelica.glProfile", "");
     public static final boolean DISABLE_NVIDIA_WORKAROUND = Boolean.getBoolean("angelica.disableNvidiaWorkaround");
     public static final boolean DISABLE_LTW_WORKAROUND = Boolean.getBoolean("angelica.disableLtwWorkaround");
@@ -40,6 +41,29 @@ public final class SystemProperties {
     public static final int SDL_FRAMES_IN_FLIGHT = Integer.getInteger("angelica.sdlgpu.framesInFlight", 2);
     public static final boolean DISABLE_SDL_PRESENTER_THREAD = Boolean.getBoolean("angelica.sdlgpu.disablePresenterThread");
     public static final boolean SDL_DISABLE_IN_PASS_CLEAR = Boolean.getBoolean("angelica.sdlgpu.disableInPassClear");
+
+    // Vulkan
+    public static final String KEY_USE_VULKAN = "angelica.vulkan";
+    public static final Boolean VULKAN_OVERRIDE = parseBooleanOverride(KEY_USE_VULKAN);
+    public static final boolean VULKAN_STATS = Boolean.getBoolean("angelica.vulkan.stats");
+    public static final boolean VULKAN_DEBUG = Boolean.getBoolean("angelica.vulkan.debug");
+    public static final int VULKAN_PRESENT_WAIT_DEPTH = Math.max(1, Math.min(3, Integer.getInteger("angelica.vulkan.presentWaitDepth", 2)));
+    public static final boolean NATIVE_EARLY_UPLOADS = Boolean.getBoolean("angelica.native.earlyUploads");
+    public static final boolean DISABLE_VULKAN_PRESENT_QUEUE = Boolean.getBoolean("angelica.vulkan.disablePresentQueue");
+    public static final boolean DISABLE_VULKAN_DEFER_PASSES = Boolean.getBoolean("angelica.vulkan.disableDeferPasses");
+    public static final int VULKAN_FRAMES_IN_FLIGHT = Math.max(1, Math.min(3, Integer.getInteger("angelica.vulkan.framesInFlight", 3)));
+    public static final String VULKAN_DEVICE = System.getProperty("angelica.vulkan.device", "").trim();
+    public static final boolean VULKAN_ALLOW_SOFTWARE = Boolean.getBoolean("angelica.vulkan.allowSoftware");
+    // MoltenVK
+    public static final boolean DISABLE_MOLTENVK_ASYNC_SUBMIT = Boolean.getBoolean("angelica.moltenvk.disableAsyncSubmit");
+    public static final boolean MOLTENVK_ARGUMENT_BUFFERS = Boolean.getBoolean("angelica.moltenvk.argumentBuffers");
+
+    // Metal
+    public static final String KEY_USE_METAL = "angelica.metal";
+    public static final Boolean METAL_OVERRIDE = parseBooleanOverride(KEY_USE_METAL);
+    public static final boolean METAL_STATS = Boolean.getBoolean("angelica.metal.stats");
+    public static final boolean METAL_DEBUG = Boolean.getBoolean("angelica.metal.debug");
+    public static final int METAL_FRAMES_IN_FLIGHT = Math.max(1, Math.min(3, Integer.getInteger("angelica.metal.framesInFlight", 3)));
 
     // Tracy
     public static final Boolean TRACY_OVERRIDE = parseBooleanOverride("angelica.tracy");

@@ -18,6 +18,7 @@ import static com.gtnewhorizons.angelica.glsm.GLStateManager.LOGGER;
 import static com.gtnewhorizons.angelica.glsm.GLStateManager.ctx;
 import static com.gtnewhorizons.angelica.glsm.GLStateManager.isCachingEnabled;
 import static com.gtnewhorizons.angelica.glsm.GLStateManager.mod;
+import static com.gtnewhorizons.angelica.glsm.GLStateManager.recordError;
 import static com.gtnewhorizons.angelica.glsm.GLStateManager.rejectExitCapture;
 
 public final class GLSMLighting {
@@ -33,7 +34,8 @@ public final class GLSMLighting {
         } else if (face == GL11.GL_BACK) {
             state = glCtx.backMaterial;
         } else {
-            throw new RuntimeException("Invalid face parameter specified to glGetMaterial: " + face);
+            recordError(GL11.GL_INVALID_ENUM);
+            return;
         }
 
         switch (pname) {
@@ -83,6 +85,14 @@ public final class GLSMLighting {
         putLightingInts(scratch, pname, true, params);
     }
 
+    /** The state of a light GL has, or null with its error for one it does not. */
+    private static LightStateStack lightState(GLContextState glCtx, int light) {
+        final int index = light - GL11.GL_LIGHT0;
+        if (index >= 0 && index < glCtx.lightDataStates.length) return glCtx.lightDataStates[index];
+        recordError(GL11.GL_INVALID_ENUM);
+        return null;
+    }
+
     public static void glGetLight(int light, int pname, IntBuffer params) {
         final FloatBuffer scratch = ctx().queryScratch;
         scratch.clear();
@@ -92,7 +102,8 @@ public final class GLSMLighting {
 
     public static void glGetLight(int light, int pname, FloatBuffer params) {
         rejectExitCapture();
-        final LightStateStack state = ctx().lightDataStates[light - GL11.GL_LIGHT0];
+        final LightStateStack state = lightState(ctx(), light);
+        if (state == null) return;
         switch (pname) {
             case GL11.GL_AMBIENT -> state.ambient.get(params.position(), params);
             case GL11.GL_DIFFUSE -> state.diffuse.get(params.position(), params);
@@ -175,7 +186,8 @@ public final class GLSMLighting {
     }
 
     static void disableColorMaterial(GLContextState glCtx) {
-        bakeCurrentColorIntoTrackedMaterial(glCtx);
+        // The tracked material keeps the last colour it followed once color material is disabled.
+        if (glCtx.colorMaterial.isEnabled()) bakeCurrentColorIntoTrackedMaterial(glCtx);
         glCtx.colorMaterial.disable();
     }
 
@@ -380,7 +392,8 @@ public final class GLSMLighting {
             final boolean b = glMaterialBack(pname, params);
             changed = f || b;
         } else {
-            throw new RuntimeException("Unsupported face value for glMaterial: " + face);
+            recordError(GL11.GL_INVALID_ENUM);
+            return;
         }
         if (changed) glCtx.lightingGeneration++;
     }
@@ -413,7 +426,8 @@ public final class GLSMLighting {
             final boolean b = glMaterialBack(pname, params);
             changed = f || b;
         } else {
-            throw new RuntimeException("Unsupported face value for glMaterial: " + face);
+            recordError(GL11.GL_INVALID_ENUM);
+            return;
         }
         if (changed) glCtx.lightingGeneration++;
     }
@@ -429,7 +443,12 @@ public final class GLSMLighting {
             }
         }
         if (pname != GL11.GL_SHININESS) {
-            // it is only valid to call glMaterialf for the GL_SHININESS parameter
+            // Only GL_SHININESS takes one value.
+            recordError(GL11.GL_INVALID_ENUM);
+            return;
+        }
+        if (val < 0f || val > 128f) {
+            recordError(GL11.GL_INVALID_VALUE);
             return;
         }
 
@@ -447,7 +466,8 @@ public final class GLSMLighting {
             final boolean b = glCtx.backMaterial.setShininess(val);
             changed = f || b;
         } else {
-            throw new RuntimeException("Unsupported face value for glMaterial: " + face);
+            recordError(GL11.GL_INVALID_ENUM);
+            return;
         }
         if (changed) glCtx.lightingGeneration++;
     }
@@ -468,7 +488,8 @@ public final class GLSMLighting {
                 return;
             }
         }
-        final LightStateStack lightState = glCtx.lightDataStates[light - GL11.GL_LIGHT0];
+        final LightStateStack lightState = lightState(glCtx, light);
+        if (lightState == null) return;
         mod(lightState);
         final boolean changed = switch (pname) {
             case GL11.GL_AMBIENT -> lightState.setAmbient(params);
@@ -504,7 +525,8 @@ public final class GLSMLighting {
                 return;
             }
         }
-        final LightStateStack lightState = glCtx.lightDataStates[light - GL11.GL_LIGHT0];
+        final LightStateStack lightState = lightState(glCtx, light);
+        if (lightState == null) return;
         mod(lightState);
         final boolean changed = switch (pname) {
             case GL11.GL_AMBIENT -> lightState.setAmbient(params);
@@ -532,7 +554,8 @@ public final class GLSMLighting {
                 return;
             }
         }
-        final LightStateStack lightState = glCtx.lightDataStates[light - GL11.GL_LIGHT0];
+        final LightStateStack lightState = lightState(glCtx, light);
+        if (lightState == null) return;
         mod(lightState);
         final boolean changed = switch (pname) {
             case GL11.GL_SPOT_EXPONENT -> lightState.setSpotExponent(param);
@@ -555,7 +578,8 @@ public final class GLSMLighting {
                 return;
             }
         }
-        final LightStateStack lightState = glCtx.lightDataStates[light - GL11.GL_LIGHT0];
+        final LightStateStack lightState = lightState(glCtx, light);
+        if (lightState == null) return;
         mod(lightState);
         final boolean changed = switch (pname) {
             case GL11.GL_SPOT_EXPONENT -> lightState.setSpotExponent(param);
@@ -627,10 +651,15 @@ public final class GLSMLighting {
                 return;
             }
         }
+        if (!lightModelScalar(pname, param)) {
+            recordError(GL11.GL_INVALID_ENUM);
+            return;
+        }
 
         if (isCachingEnabled()) {
             mod(glCtx.lightModel);
             final boolean changed = switch (pname) {
+                case GL12.GL_LIGHT_MODEL_COLOR_CONTROL -> glCtx.lightModel.setColorControl((int) param);
                 case GL11.GL_LIGHT_MODEL_LOCAL_VIEWER -> glCtx.lightModel.setLocalViewer(param);
                 case GL11.GL_LIGHT_MODEL_TWO_SIDE -> glCtx.lightModel.setTwoSide(param);
                 default -> false;
@@ -649,6 +678,10 @@ public final class GLSMLighting {
                 return;
             }
         }
+        if (!lightModelScalar(pname, param)) {
+            recordError(GL11.GL_INVALID_ENUM);
+            return;
+        }
 
         if (isCachingEnabled()) {
             mod(glCtx.lightModel);
@@ -662,7 +695,18 @@ public final class GLSMLighting {
         }
     }
 
+    /** The light model parameters that take one value; GL_LIGHT_MODEL_AMBIENT takes four. */
+    private static boolean lightModelScalar(int pname, float param) {
+        if (pname == GL12.GL_LIGHT_MODEL_COLOR_CONTROL) return param == GL12.GL_SINGLE_COLOR || param == GL12.GL_SEPARATE_SPECULAR_COLOR;
+        return pname == GL11.GL_LIGHT_MODEL_LOCAL_VIEWER || pname == GL11.GL_LIGHT_MODEL_TWO_SIDE;
+    }
+
     public static void glColorMaterial(int face, int mode) {
+        if (face != GL11.GL_FRONT && face != GL11.GL_BACK && face != GL11.GL_FRONT_AND_BACK
+            || mode != GL11.GL_EMISSION && mode != GL11.GL_AMBIENT && mode != GL11.GL_DIFFUSE && mode != GL11.GL_SPECULAR && mode != GL11.GL_AMBIENT_AND_DIFFUSE) {
+            recordError(GL11.GL_INVALID_ENUM);
+            return;
+        }
         final GLContextState glCtx = ctx();
         glCtx.exitCapture.write(ExitStateCapture.COLOR_MATERIAL_SETTINGS);
         final RecordMode recordMode = DisplayListManager.getRecordMode();

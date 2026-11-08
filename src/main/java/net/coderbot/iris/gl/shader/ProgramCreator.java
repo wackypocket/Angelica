@@ -79,6 +79,7 @@ public class ProgramCreator {
 		int result = GLSMPrograms.glGetProgrami(program, GL20.GL_LINK_STATUS);
 
 		if (result != GL11.GL_TRUE) {
+			GLSMPrograms.glDeleteProgram(program);
 			throw new RuntimeException("Shader program linking failed, see log for details");
 		}
 

@@ -58,7 +58,7 @@ public final class GlslVulkanPreprocess {
     private GlslVulkanPreprocess() {}
 
     private record CacheKey(String source, int glShaderType, boolean separateReadOnlyImages) {}
-    public record Result(String rewrittenSource, Set<String> boolUniforms, Set<String> explicitVsInputs, Map<String, UniformBlock> uniformBlocks) {}
+    public record Result(String rewrittenSource, Set<String> boolUniforms, Set<String> explicitVsInputs, Map<String, UniformBlock> uniformBlocks, Map<String, Integer> explicitVaryings, Map<String, Integer> explicitUniforms) {}
 
     public record UniformBlock(String qualifierText, @Nullable String instanceName) {}
 
@@ -113,7 +113,7 @@ public final class GlslVulkanPreprocess {
         final List<Edit> edits = new ArrayList<>();
         final Metadata meta = collectEdits(new ShaderIndex(root, source), glShaderType, debugName, separateReadOnlyImages, edits);
 
-        final Result out = new Result(applyEdits(source, edits), meta.boolUniforms(), meta.explicitVsInputs(), meta.uniformBlocks());
+        final Result out = new Result(applyEdits(source, edits), meta.boolUniforms(), meta.explicitVsInputs(), meta.uniformBlocks(), meta.explicitVaryings(), meta.explicitUniforms());
         synchronized (CACHE) {
             CACHE.putAndMoveToFirst(key, out);
             while (CACHE.size() > CACHE_MAX) CACHE.removeLast();
@@ -121,7 +121,12 @@ public final class GlslVulkanPreprocess {
         return out;
     }
 
-    public record Metadata(Set<String> boolUniforms, Set<String> explicitVsInputs, boolean needsSamplerless, Map<String, UniformBlock> uniformBlocks) {}
+    /** {@code explicitVaryings} maps each in and out declaring a location to its {@link #varyingKey}; {@code explicitUniforms} maps each uniform declaring one to it. */
+    public record Metadata(Set<String> boolUniforms, Set<String> explicitVsInputs, boolean needsSamplerless, Map<String, UniformBlock> uniformBlocks, Map<String, Integer> explicitVaryings, Map<String, Integer> explicitUniforms) {}
+
+    private static int varyingKey(int location, int component) {
+        return location << 2 | component;
+    }
 
     public static Metadata collectEdits(ShaderIndex index, int glShaderType, String debugName, boolean separateReadOnlyImages, List<Edit> edits) {
         final boolean isVertex = glShaderType == GL20.GL_VERTEX_SHADER;
@@ -129,6 +134,8 @@ public final class GlslVulkanPreprocess {
         Map<String, UniformBlock> uniformBlocks = Map.of();
         final Set<String> explicitInputs = new HashSet<>();
         final Set<String> readOnlyImages = new HashSet<>();
+        final Map<String, Integer> explicitVaryings = new HashMap<>();
+        final Map<String, Integer> explicitUniforms = new HashMap<>();
         boolean needsSamplerless = false;
 
         int maxExplicitLoc = -1;
@@ -152,14 +159,16 @@ public final class GlslVulkanPreprocess {
             final GLSLParser.Type_qualifierContext tq = fst.type_qualifier();
             if (tq == null) continue;
 
-            boolean hasUniform = false, hasIn = false, hasLocation = false, hasReadonly = false;
+            boolean hasUniform = false, hasIn = false, hasOut = false, hasLocation = false, hasReadonly = false;
             int locValue = -1;
+            int componentValue = 0;
             int bindingValue = -1;
             for (GLSLParser.Single_type_qualifierContext stq : tq.single_type_qualifier()) {
                 if (stq.storage_qualifier() != null) {
                     final String s = stq.storage_qualifier().getText();
                     if ("uniform".equals(s)) hasUniform = true;
                     else if ("in".equals(s)) hasIn = true;
+                    else if ("out".equals(s)) hasOut = true;
                     else if ("readonly".equals(s)) hasReadonly = true;
                 } else if (stq.layout_qualifier() != null) {
                     for (GLSLParser.Layout_qualifier_idContext id : stq.layout_qualifier().layout_qualifier_id_list().layout_qualifier_id()) {
@@ -168,10 +177,12 @@ public final class GlslVulkanPreprocess {
                         if ("location".equals(qualifier)) {
                             hasLocation = true;
                             if (id.constant_expression() != null) {
-                                try { locValue = Integer.parseInt(id.constant_expression().getText()); } catch (NumberFormatException ignored) {}
+                                try { locValue = Integer.decode(id.constant_expression().getText()); } catch (NumberFormatException ignored) {}
                             }
+                        } else if ("component".equals(qualifier) && id.constant_expression() != null) {
+                            try { componentValue = Integer.decode(id.constant_expression().getText()); } catch (NumberFormatException ignored) { }
                         } else if ("binding".equals(qualifier) && id.constant_expression() != null) {
-                            try { bindingValue = Integer.parseInt(id.constant_expression().getText()); } catch (NumberFormatException ignored) {}
+                            try { bindingValue = Integer.decode(id.constant_expression().getText()); } catch (NumberFormatException ignored) {}
                         }
                     }
                 }
@@ -180,6 +191,11 @@ public final class GlslVulkanPreprocess {
             final boolean boolDecl = hasUniform && isBool(fst);
             final boolean explicitInputDecl = isVertex && hasIn && hasLocation;
             final List<GLSLParser.Typeless_declarationContext> declarators = ShaderIndex.declarators(list);
+            if (locValue >= 0 && declarators.size() == 1 && declarators.get(0).IDENTIFIER() != null && (hasIn || hasOut || hasUniform)) {
+                final String name = declarators.get(0).IDENTIFIER().getText();
+                if (hasUniform) explicitUniforms.put(name, locValue);
+                else explicitVaryings.put(name, varyingKey(locValue, componentValue));
+            }
             for (GLSLParser.Typeless_declarationContext td : declarators) {
                 handleDeclarator(td, hasUniform, boolDecl, explicitInputDecl, bools, explicitInputs, edits);
             }
@@ -236,7 +252,12 @@ public final class GlslVulkanPreprocess {
             }
         }
 
-        return new Metadata(bools, explicitInputs, needsSamplerless, uniformBlocks);
+        return new Metadata(bools, explicitInputs, needsSamplerless, uniformBlocks, explicitVaryings, explicitUniforms);
+    }
+
+    /** What a shader's source called an identifier the rewrite renamed, which is the name a client asks for. */
+    public static String sourceName(String compiled) {
+        return compiled.replace(SAMPLER_RENAMED, "sampler").replace(RESERVED_RENAMED_PREFIX, "");
     }
 
     public static boolean renamesIdentifier(String name) {

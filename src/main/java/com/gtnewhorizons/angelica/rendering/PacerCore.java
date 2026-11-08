@@ -16,7 +16,7 @@ final class PacerCore {
     private static final long IDLE_MIN_BUDGET_NANOS = 500_000L;
     private static final long PRESENT_SLOP_NANOS = 50_000L;
 
-    private static final int PROBE_LEAD_PERIODS = 2;
+    static final int DEFAULT_PROBE_LEAD_PERIODS = RenderBackend.DEFAULT_PROBE_LEAD_PERIODS;
     static final int PROBE_LEAD_DIVISOR = 8;
     static final int LOCK_PAIRS = 3;
     static final int LOCK_FRAMES = 600;
@@ -38,6 +38,7 @@ final class PacerCore {
     private LongConsumer idleWork;
 
     private long refreshPeriodNanos;
+    private int probeLeadPeriods = DEFAULT_PROBE_LEAD_PERIODS;
     private boolean fifo = true;
     private boolean vsyncOn = true;
     private int capHz;
@@ -106,6 +107,12 @@ final class PacerCore {
         final long p = Math.max(periodNanos, 0L);
         if (p == refreshPeriodNanos) return;
         refreshPeriodNanos = p;
+        dropLock();
+    }
+
+    void setProbeLeadPeriods(int periods) {
+        if (periods == probeLeadPeriods) return;
+        probeLeadPeriods = periods;
         dropLock();
     }
 
@@ -184,7 +191,7 @@ final class PacerCore {
         final long step = probing ? c - c / PROBE_LEAD_DIVISOR : c;
         if (probing) {
             probeLeadNanos += c - step;
-            probeExhausted = probeLeadNanos >= PROBE_LEAD_PERIODS * c;
+            probeExhausted = probeLeadNanos >= probeLeadPeriods * c;
         }
 
         frameAnchor = !haveTarget;
@@ -271,6 +278,10 @@ final class PacerCore {
 
     boolean locked() {
         return locked;
+    }
+
+    boolean expectsDriverPacing() {
+        return vsyncOn && cadenceNanos > 0L && cadenceNanos == refreshPeriodNanos;
     }
 
     boolean probing() {

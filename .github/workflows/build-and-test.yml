@@ -51,3 +51,42 @@ jobs:
             lwjgl3-backend/build/test-results/
             lwjgl3-backend/build/reports/tests/
             lwjgl3-backend/hs_err_pid*.log
+
+  glemu-backends-tests:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    concurrency:
+      group: glemu-backends-tests-${{ github.event.pull_request.number || github.ref }}
+      cancel-in-progress: true
+    steps:
+      - name: Install a software Vulkan driver and OpenGL
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y xvfb mesa-vulkan-drivers libgl1 libgl1-mesa-dri
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: |
+            21
+            25
+      - uses: gradle/actions/setup-gradle@v5
+      - name: Run Vulkan backend tests
+        run: xvfb-run -a --server-args="-screen 0 1366x768x24" ./gradlew --build-cache --stacktrace --continue -Pangelica.requireDevice=true :vulkan:vulkanDeviceTest :vulkan:glsmVulkanTest
+      - name: Compare with a real OpenGL driver
+        continue-on-error: true
+        run: |
+          xvfb-run -a --server-args="-screen 0 1366x768x24" ./gradlew --build-cache --stacktrace :vulkan:glOracleTest
+          python3 glemu/scripts/compare_conformance.py vulkan/build/conformance/oracle.txt vulkan/build/conformance/backend.txt glemu/scripts/conformance-known-differences.txt
+      - name: Check LWJGL did not extract natives to the shared temp dir
+        run: test ! -e "/tmp/lwjgl_$USER"
+      - name: Attach glemu backend test results
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: glemu-backends-test-results
+          path: |
+            vulkan/build/conformance/
+            vulkan/build/test-results/
+            vulkan/build/reports/tests/
+            vulkan/hs_err_pid*.log

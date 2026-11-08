@@ -6,6 +6,7 @@ import com.gtnewhorizons.angelica.common.BlockTest;
 import com.gtnewhorizons.angelica.common.TileEntityClipPlaneTest;
 import com.gtnewhorizons.angelica.config.AngelicaConfig;
 import cpw.mods.fml.common.event.FMLInitializationEvent;
+import cpw.mods.fml.common.event.FMLLoadCompleteEvent;
 import cpw.mods.fml.common.event.FMLPostInitializationEvent;
 import cpw.mods.fml.common.event.FMLPreInitializationEvent;
 import cpw.mods.fml.common.registry.GameRegistry;
@@ -24,6 +25,8 @@ public class CommonProxy {
     public void init(FMLInitializationEvent event) {}
 
     public void postInit(FMLPostInitializationEvent event) {}
+
+    public void loadComplete(FMLLoadCompleteEvent event) {}
 
     // Only present on the client!
     public void putFrametime(long time) { throw new UnsupportedOperationException(); }

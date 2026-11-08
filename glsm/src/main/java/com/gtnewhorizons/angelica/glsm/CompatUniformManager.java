@@ -1,6 +1,7 @@
 package com.gtnewhorizons.angelica.glsm;
 
 import com.gtnewhorizons.angelica.glsm.ffp.FragmentKey;
+import org.lwjgl.opengl.GL20;
 import com.gtnewhorizons.angelica.glsm.ffp.Uniforms;
 import com.gtnewhorizons.angelica.glsm.stacks.FogStateStack;
 import com.gtnewhorizons.angelica.glsm.stacks.LightStateStack;
@@ -172,6 +173,8 @@ public class CompatUniformManager {
     }
 
     public static void onLinkProgram(int program) {
+        // Asking a program that failed to link is an error of ours, not the mod's.
+        if (RENDER_BACKEND.getProgrami(program, GL20.GL_LINK_STATUS) == GL11.GL_FALSE) return;
         int[] locs = new int[LOC_COUNT];
         boolean hasAny = false;
 

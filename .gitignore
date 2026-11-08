@@ -48,3 +48,8 @@ dist/tracy-natives/
 
 tracy-client/angelica/
 shaderc_failures/
+
+__pycache__/
+**/angelica/natives/
+hs_err_pid*.log
+replay_pid*.log

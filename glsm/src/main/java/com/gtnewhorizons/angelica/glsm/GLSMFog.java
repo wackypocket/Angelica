@@ -6,8 +6,10 @@ import com.gtnewhorizons.angelica.glsm.stacks.BooleanStateStack;
 import com.gtnewhorizons.angelica.glsm.stacks.FogStateStack;
 import org.joml.Vector3d;
 import org.lwjgl.opengl.GL11;
+import org.lwjgl.opengl.GL14;
 import java.nio.FloatBuffer;
 
+import static com.gtnewhorizons.angelica.glsm.GLStateManager.recordError;
 import static com.gtnewhorizons.angelica.glsm.GLStateManager.HAS_MULTIPLE_SET;
 import static com.gtnewhorizons.angelica.glsm.GLStateManager.beforeUncapturedStateChange;
 import static com.gtnewhorizons.angelica.glsm.GLStateManager.ctx;
@@ -55,8 +57,25 @@ public final class GLSMFog {
         }
     }
 
+    /** Checks a scalar glFog parameter (GL_FOG_COLOR only comes as a vector); 0x855A is NV_fog_distance's GL_FOG_DISTANCE_MODE_NV. */
+    private static boolean fogParameter(int pname, float value) {
+        final boolean known = pname == GL11.GL_FOG_MODE || pname == GL11.GL_FOG_DENSITY || pname == GL11.GL_FOG_START || pname == GL11.GL_FOG_END
+            || pname == GL11.GL_FOG_INDEX || pname == GL14.GL_FOG_COORDINATE_SOURCE || pname == 0x855A;
+        if (!known || pname == GL11.GL_FOG_MODE && value != GL11.GL_LINEAR && value != GL11.GL_EXP && value != GL11.GL_EXP2
+            || pname == GL14.GL_FOG_COORDINATE_SOURCE && value != GL14.GL_FOG_COORDINATE && value != GL14.GL_FRAGMENT_DEPTH) {
+            recordError(GL11.GL_INVALID_ENUM);
+            return false;
+        }
+        if (pname == GL11.GL_FOG_DENSITY && value < 0f) {
+            recordError(GL11.GL_INVALID_VALUE);
+            return false;
+        }
+        return true;
+    }
+
     public static void glFog(int pname, FloatBuffer param) {
         rejectExitCapture();
+        if (pname != GL11.GL_FOG_COLOR && !fogParameter(pname, param.get(param.position()))) return;
         final GLContextState glCtx = ctx();
         final RecordMode mode = DisplayListManager.getRecordMode();
         if (mode != RecordMode.NONE) {
@@ -111,6 +130,7 @@ public final class GLSMFog {
 
     public static void glFogf(int pname, float param) {
         rejectExitCapture();
+        if (!fogParameter(pname, param)) return;
         final GLContextState glCtx = ctx();
         final RecordMode mode = DisplayListManager.getRecordMode();
         if (mode != RecordMode.NONE) {
@@ -119,6 +139,8 @@ public final class GLSMFog {
                 return;
             }
         }
+        if (pname == GL14.GL_FOG_COORDINATE_SOURCE) glCtx.fogCoordSource = (int) param;
+        if (pname == GL11.GL_FOG_INDEX) glCtx.fogIndex = param;
         // Update cached state (FFP shader reads from cache)
         if (isCachingEnabled()) {
             boolean changed = false;
@@ -140,6 +162,7 @@ public final class GLSMFog {
 
     public static void glFogi(int pname, int param) {
         rejectExitCapture();
+        if (!fogParameter(pname, param)) return;
         final GLContextState glCtx = ctx();
         final RecordMode mode = DisplayListManager.getRecordMode();
         if (mode != RecordMode.NONE) {
@@ -148,6 +171,8 @@ public final class GLSMFog {
                 return;
             }
         }
+        if (pname == GL14.GL_FOG_COORDINATE_SOURCE) glCtx.fogCoordSource = param;
+        if (pname == GL11.GL_FOG_INDEX) glCtx.fogIndex = param;
         // Update cached state (FFP shader reads from cache)
         if (isCachingEnabled() && pname == GL11.GL_FOG_MODE && (!isCachingEnabled() || glCtx.fogState.getFogMode() != param)) {
             beforeUncapturedStateChange();

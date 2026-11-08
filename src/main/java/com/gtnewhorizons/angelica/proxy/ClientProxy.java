@@ -36,7 +36,6 @@ import com.gtnewhorizon.gtnhlib.client.renderer.vao.VAOManager;
 import com.gtnewhorizons.angelica.client.font.DarkModeUtils;
 import com.gtnewhorizons.angelica.client.font.FontProviderBitmap;
 import com.gtnewhorizons.angelica.commands.AngelicaCommand;
-import com.gtnewhorizons.angelica.AngelicaMod;
 import com.gtnewhorizons.angelica.common.BlockError;
 import com.gtnewhorizons.angelica.common.BlockIsbrhTest;
 import com.gtnewhorizons.angelica.common.TileEntityClipPlaneTest;
@@ -92,6 +91,7 @@ import cpw.mods.fml.client.registry.ClientRegistry;
 import cpw.mods.fml.client.registry.RenderingRegistry;
 import cpw.mods.fml.common.FMLCommonHandler;
 import cpw.mods.fml.common.event.FMLInitializationEvent;
+import cpw.mods.fml.common.event.FMLLoadCompleteEvent;
 import cpw.mods.fml.common.event.FMLPostInitializationEvent;
 import cpw.mods.fml.common.event.FMLPreInitializationEvent;
 import cpw.mods.fml.common.eventhandler.EventPriority;
@@ -102,7 +102,6 @@ import cpw.mods.fml.relauncher.ReflectionHelper;
 import jss.notfine.core.Settings;
 import jss.notfine.gui.options.named.FOVMode;
 import me.flashyreese.mods.reeses_sodium_options.client.gui.ReeseSodiumVideoOptionsScreen;
-import me.jellysquid.mods.sodium.client.gui.FrameRateOptions;
 import me.jellysquid.mods.sodium.client.gui.SodiumGameOptions;
 import net.coderbot.iris.Iris;
 
@@ -124,15 +123,33 @@ public final class ClientProxy extends CommonProxy {
         return CONFIG;
     }
 
-    public static void toggleVSync(boolean enabled) {
-        final SodiumGameOptions opts = options();
-        opts.advanced.vsyncMode = enabled ? GLStateManager.preferredTearFreeMode() : VSyncMode.OFF;
-        try {
-            opts.writeChanges();
-        } catch (IOException e) {
-            AngelicaMod.LOGGER.warn("Could not persist the vsync mode", e);
+    /**
+     * Set at load complete; the migration runs on the first client tick instead, because FML reloads options.txt once
+     * loading finishes (for mod key bindings), dropping any vanilla setting changed before then, and Forge's
+     * saveOptions does nothing while loading.
+     */
+    private boolean migrateSettingsOnTick;
+
+    private void migrateSavedSettings() {
+        final SodiumGameOptions options = options();
+        boolean migrated = options.migrateFramerateScale(mc.gameSettings);
+        final Boolean vsync = options.advanced.takeMigratedVsync();
+        if (vsync != null) {
+            mc.gameSettings.enableVsync = vsync;
+            migrated = true;
         }
-        GLStateManager.setVSyncMode(opts.advanced.vsyncMode);
+        if (!migrated) return;
+        mc.gameSettings.saveOptions();
+        if (options.isUnreadableOnDisk()) return;
+        try {
+            options.writeChanges();
+        } catch (IOException e) {
+            LOGGER.warn("Could not save migrated settings", e);
+        }
+    }
+
+    public static void toggleVSync(boolean enabled) {
+        GLStateManager.setVSyncEnabled(enabled);
     }
 
     @Override
@@ -168,12 +185,8 @@ public final class ClientProxy extends CommonProxy {
         CeleritasSetup.ensureInitialized();
         TextureSamplers.initRenderer();
         DarkModeUtils.init();
-        final SodiumGameOptions opts = options();
-        if (opts.advanced.vsyncMode == null) {
-            opts.advanced.vsyncMode = FrameRateOptions.defaultMode();
-        }
-        Minecraft.getMinecraft().gameSettings.enableVsync = opts.advanced.vsyncMode.tearFree();
-        GLStateManager.setVSyncPreference(opts.advanced.vsyncMode);
+        final VSyncMode stored = options().advanced.presentMode;
+        GLStateManager.setVSyncPreference(stored != null && stored.tearFree() ? stored : VSyncMode.ON);
         FramePacer.setIdleWork(deadlineNanos -> {
             final CeleritasWorldRenderer renderer = CeleritasWorldRenderer.getInstanceOrNull();
             if (renderer != null) renderer.runFrameIdleWork(deadlineNanos);
@@ -246,6 +259,11 @@ public final class ClientProxy extends CommonProxy {
     }
 
     private long worldSection;
+
+    @Override
+    public void loadComplete(FMLLoadCompleteEvent event) {
+        this.migrateSettingsOnTick = true;
+    }
 
     @SubscribeEvent
     public void worldLoad(WorldEvent.Load event) {
@@ -321,7 +339,7 @@ public final class ClientProxy extends CommonProxy {
 
     @SubscribeEvent(priority = EventPriority.LOWEST)
     public void onGuiOpen(GuiOpenEvent event) {
-        if (BackendManager.RENDER_BACKEND.isSDLGPU()) BackendStartGuard.latch();
+        if (BackendManager.RENDER_BACKEND.emulatesGL()) BackendStartGuard.latch();
         if (!event.isCanceled()) {
             if (event.gui instanceof GuiMainMenu && gameStartTime == -1) {
                 gameStartTime = ManagementFactory.getRuntimeMXBean().getUptime() / 1000f;
@@ -357,6 +375,10 @@ public final class ClientProxy extends CommonProxy {
             return;
         }
         DebugScreen.onClientTickEnd();
+        if (this.migrateSettingsOnTick) {
+            this.migrateSettingsOnTick = false;
+            migrateSavedSettings();
+        }
         TesrLightCache.onClientTick();
         if (mc.theWorld != null) {
             CloudRenderer.getCloudRenderer().checkSettings();

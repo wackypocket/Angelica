@@ -7,7 +7,6 @@ import com.gtnewhorizons.angelica.glsm.backend.DebugMessageHandler;
 import com.gtnewhorizons.angelica.glsm.backend.MainThreadPump;
 import com.gtnewhorizons.retrofuturabootstrap.MainStartOnFirstThread;
 import com.gtnewhorizons.angelica.glsm.GLScreenCapture;
-import com.gtnewhorizons.angelica.glsm.backend.RenderBackend;
 import com.gtnewhorizons.angelica.glsm.backend.ScreenCapture;
 import com.gtnewhorizons.angelica.glsm.backend.VSyncMode;
 import com.gtnewhorizons.angelica.glsm.texture.ProxyTexture;
@@ -76,7 +75,7 @@ import java.util.concurrent.ConcurrentLinkedQueue;
  * NOTE: This is _not_ redirected by lwjgl3ify at runtime and targets lwjgl3 directly
  */
 @Lwjgl3Aware
-public final class Lwjgl3GLRenderBackend extends RenderBackend {
+public final class Lwjgl3GLRenderBackend extends WindowTrackingRenderBackend {
     private static final Logger LOGGER = LogManager.getLogger("Lwjgl3GLRenderBackend");
 
     private GLCapabilities caps;
@@ -91,6 +90,7 @@ public final class Lwjgl3GLRenderBackend extends RenderBackend {
 
     @Override
     public void init() {
+        WindowedBounds.showMenuBarInFullscreen();
         caps = GL.getCapabilities();
         if (GLStateManager.isWindows()) {
             final String vendor = GL11C.glGetString(GL11C.GL_VENDOR);

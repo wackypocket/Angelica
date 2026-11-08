@@ -195,6 +195,7 @@ public final class GLSMEnable {
     }
 
     public static boolean glIsEnabled(int cap) {
+        if (!RENDER_BACKEND.checks().isEnabled(cap)) return false;
         rejectExitCapture();
         final GLContextState glCtx = ctx();
         if (!isCachingEnabled()) {

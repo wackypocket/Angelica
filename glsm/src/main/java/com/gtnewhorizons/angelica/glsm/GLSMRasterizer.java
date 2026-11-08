@@ -20,6 +20,7 @@ import java.nio.DoubleBuffer;
 import java.nio.FloatBuffer;
 import java.nio.IntBuffer;
 
+import static com.gtnewhorizons.angelica.glsm.GLStateManager.recordError;
 import static com.gtnewhorizons.angelica.glsm.GLStateManager.LOGGER;
 import static com.gtnewhorizons.angelica.glsm.GLStateManager.MAX_CLIP_PLANES;
 import static com.gtnewhorizons.angelica.glsm.GLStateManager.beforeUncapturedStateChange;
@@ -45,7 +46,10 @@ public final class GLSMRasterizer {
     public static void glGetClipPlane(int plane, DoubleBuffer equation) {
         rejectExitCapture();
         final int index = plane - GL11.GL_CLIP_PLANE0;
-        if (index < 0 || index >= MAX_CLIP_PLANES) return;
+        if (index < 0 || index >= MAX_CLIP_PLANES) {
+            recordError(GL11.GL_INVALID_ENUM);
+            return;
+        }
         ctx().clipPlaneState.getEyePlane(index, equation);
     }
 
@@ -128,20 +132,24 @@ public final class GLSMRasterizer {
     }
 
     public static void glPointParameterf(int pname, float param) {
+        if (!RENDER_BACKEND.checks().pointParameterf(pname, param)) return;
         pointParameter(pname, param, 0.0f, 0.0f);
     }
 
     public static void glPointParameteri(int pname, int param) {
+        if (!RENDER_BACKEND.checks().pointParameteri(pname, param)) return;
         pointParameter(pname, param, 0.0f, 0.0f);
     }
 
     public static void glPointParameter(int pname, FloatBuffer params) {
+        if (!RENDER_BACKEND.checks().pointParameterf(pname, params.get(params.position()))) return;
         final int pos = params.position();
         final boolean attenuation = pname == GL14.GL_POINT_DISTANCE_ATTENUATION;
         pointParameter(pname, params.get(pos), attenuation ? params.get(pos + 1) : 0.0f, attenuation ? params.get(pos + 2) : 0.0f);
     }
 
     public static void glPointParameter(int pname, IntBuffer params) {
+        if (!RENDER_BACKEND.checks().pointParameteri(pname, params.get(params.position()))) return;
         final int pos = params.position();
         final boolean attenuation = pname == GL14.GL_POINT_DISTANCE_ATTENUATION;
         pointParameter(pname, params.get(pos), attenuation ? params.get(pos + 1) : 0.0f, attenuation ? params.get(pos + 2) : 0.0f);
@@ -260,6 +268,10 @@ public final class GLSMRasterizer {
     }
 
     public static void glShadeModel(int mode) {
+        if (mode != GL11.GL_FLAT && mode != GL11.GL_SMOOTH) {
+            recordError(GL11.GL_INVALID_ENUM);
+            return;
+        }
         final GLContextState glCtx = ctx();
         glCtx.exitCapture.write(ExitStateCapture.SHADE_MODEL);
         final RecordMode recordMode = DisplayListManager.getRecordMode();
@@ -278,7 +290,10 @@ public final class GLSMRasterizer {
         }
     }
 
+    private static int maxViewportDim;
+
     public static void glViewport(int x, int y, int width, int height) {
+        if (!RENDER_BACKEND.checks().viewport(width, height)) return;
         final RecordMode mode = DisplayListManager.getRecordMode();
         if (mode != RecordMode.NONE) {
             DisplayListManager.recordViewport(x, y, width, height);
@@ -287,6 +302,16 @@ public final class GLSMRasterizer {
             }
         }
         beforeUncapturedStateChange();
+        // GL clamps the size to GL_MAX_VIEWPORT_DIMS and the origin to the viewport bounds range before storing them.
+        if (maxViewportDim == 0) {
+            final IntBuffer dims = BufferUtils.createIntBuffer(16);
+            RENDER_BACKEND.getInteger(GL11.GL_MAX_VIEWPORT_DIMS, dims);
+            maxViewportDim = dims.get(0) > 0 ? dims.get(0) : Integer.MAX_VALUE;
+        }
+        width = Math.min(width, maxViewportDim);
+        height = Math.min(height, maxViewportDim);
+        x = Math.max(-32768, Math.min(x, 32767));
+        y = Math.max(-32768, Math.min(y, 32767));
         RENDER_BACKEND.viewport(x, y, width, height);
         // Only update cached state when caching is enabled
         if (isCachingEnabled()) {
@@ -295,6 +320,7 @@ public final class GLSMRasterizer {
     }
 
     public static void glLineWidth(float width) {
+        if (!RENDER_BACKEND.checks().lineWidth(width)) return;
         rejectExitCapture();
         final GLContextState glCtx = ctx();
         final RecordMode mode = DisplayListManager.getRecordMode();
@@ -312,6 +338,7 @@ public final class GLSMRasterizer {
     }
 
     public static void glCullFace(int mode) {
+        if (!RENDER_BACKEND.checks().cullFace(mode)) return;
         final GLContextState glCtx = ctx();
         glCtx.exitCapture.write(ExitStateCapture.CULL_FACE);
         final RecordMode recordMode = DisplayListManager.getRecordMode();
@@ -329,6 +356,7 @@ public final class GLSMRasterizer {
     }
 
     public static void glFrontFace(int mode) {
+        if (!RENDER_BACKEND.checks().frontFace(mode)) return;
         final GLContextState glCtx = ctx();
         glCtx.exitCapture.write(ExitStateCapture.FRONT_FACE);
         final RecordMode recordMode = DisplayListManager.getRecordMode();
@@ -347,6 +375,7 @@ public final class GLSMRasterizer {
 
     public static void glHint(int target, int hint) {
         rejectExitCapture();
+        if (!RENDER_BACKEND.checks().hint(target, hint)) return;
         if (hint != GL11.GL_NICEST && hint != GL11.GL_FASTEST && hint != GL11.GL_DONT_CARE) {
             return;
         }
@@ -385,6 +414,7 @@ public final class GLSMRasterizer {
     }
 
     public static void glPointSize(float size) {
+        if (!RENDER_BACKEND.checks().pointSize(size)) return;
         rejectExitCapture();
         final GLContextState glCtx = ctx();
         final RecordMode mode = DisplayListManager.getRecordMode();
@@ -402,6 +432,7 @@ public final class GLSMRasterizer {
     }
 
     public static void glPolygonMode(int face, int polygonMode) {
+        if (!RENDER_BACKEND.checks().polygonMode(face, polygonMode)) return;
         rejectExitCapture();
         final GLContextState glCtx = ctx();
         final RecordMode mode = DisplayListManager.getRecordMode();
@@ -454,8 +485,10 @@ public final class GLSMRasterizer {
             glPolygonOffset(factor, units);
             return;
         }
-        if (DisplayListManager.isRecording()) {
-            throw DisplayListManager.unsupportedInList("glPolygonOffsetClamp");
+        final RecordMode recording = DisplayListManager.getRecordMode();
+        if (recording != RecordMode.NONE) {
+            DisplayListManager.recordComplexCommand(com.gtnewhorizons.angelica.glsm.recording.commands.ListedGlCall.of(() -> glPolygonOffsetClamp(factor, units, clamp)));
+            if (recording == RecordMode.COMPILE) return;
         }
         final GLContextState glCtx = ctx();
         glCtx.exitCapture.write(ExitStateCapture.OFFSET_VALUES);
@@ -470,6 +503,7 @@ public final class GLSMRasterizer {
     }
 
     public static void glScissor(int x, int y, int width, int height) {
+        if (!RENDER_BACKEND.checks().scissor(width, height)) return;
         final RecordMode mode = DisplayListManager.getRecordMode();
         if (mode != RecordMode.NONE) {
             DisplayListManager.recordScissor(x, y, width, height);
@@ -493,7 +527,10 @@ public final class GLSMRasterizer {
             return;
         }
         final int index = plane - GL11.GL_CLIP_PLANE0;
-        if (index < 0 || index >= MAX_CLIP_PLANES) return;
+        if (index < 0 || index >= MAX_CLIP_PLANES) {
+            recordError(GL11.GL_INVALID_ENUM);
+            return;
+        }
         final int pos = equation.position();
         beforeUncapturedStateChange();
         glCtx.clipPlaneState.setPlane(index, equation.get(pos), equation.get(pos + 1), equation.get(pos + 2), equation.get(pos + 3), glCtx.modelViewMatrix);
@@ -518,15 +555,17 @@ public final class GLSMRasterizer {
     }
 
     public static void glSampleCoverage(float value, boolean invert) {
-        if (DisplayListManager.isRecording()) {
-            throw DisplayListManager.unsupportedInList("glSampleCoverage");
+        final RecordMode recording = DisplayListManager.getRecordMode();
+        if (recording != RecordMode.NONE) {
+            DisplayListManager.recordSampleCoverage(value, invert);
+            if (recording == RecordMode.COMPILE) return;
         }
         beforeUncapturedStateChange();
         RENDER_BACKEND.sampleCoverage(value, invert);
     }
 
     public static void glPolygonStipple(ByteBuffer pattern) {
-        guardUnsupportedFFP("glPolygonStipple", "glPolygonStipple is not available in GL 3.3 core profile.");
+        if (!RENDER_BACKEND.polygonStipple(pattern)) guardUnsupportedFFP("glPolygonStipple", "glPolygonStipple is not available in GL 3.3 core profile.");
     }
 
     public static IntegerStateStack getShadeModelState() {

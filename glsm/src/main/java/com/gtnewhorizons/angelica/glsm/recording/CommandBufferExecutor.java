@@ -97,6 +97,18 @@ public final class CommandBufferExecutor {
                     GLSMRasterizer.glShadeModel(memGetInt(ptr));
                     ptr += 4;
                 }
+                case GLCommand.BLEND_EQUATION_SEPARATE -> {
+                    GLSMBlend.glBlendEquationSeparate(memGetInt(ptr), memGetInt(ptr + 4));
+                    ptr += 8;
+                }
+                case GLCommand.READ_BUFFER -> {
+                    GLSMFramebuffer.glReadBuffer(memGetInt(ptr));
+                    ptr += 4;
+                }
+                case GLCommand.SAMPLE_COVERAGE -> {
+                    GLSMRasterizer.glSampleCoverage(Float.intBitsToFloat(memGetInt(ptr)), memGetInt(ptr + 4) != 0);
+                    ptr += 8;
+                }
                 case GLCommand.LOGIC_OP -> {
                     GLSMBlend.glLogicOp(memGetInt(ptr));
                     ptr += 4;

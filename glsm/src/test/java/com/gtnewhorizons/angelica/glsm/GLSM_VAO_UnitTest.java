@@ -29,7 +29,7 @@ public class GLSM_VAO_UnitTest {
 
     @Test
     void testDefaultStates() {
-        verifyState(GL30.GL_VERTEX_ARRAY_BINDING, GLStateManager.ctx().defaultVAO, "GL_VERTEX_ARRAY_BINDING Initial State");
+        verifyDefaultVaoBound("GL_VERTEX_ARRAY_BINDING Initial State");
         verifyState(GL13.GL_CLIENT_ACTIVE_TEXTURE, GL13.GL_TEXTURE0, "GL_CLIENT_ACTIVE_TEXTURE Initial State");
         testClientStates();
     }
@@ -96,7 +96,7 @@ public class GLSM_VAO_UnitTest {
 
         // Check if everything got reset to default
         UniversalVAO.bindVertexArray(0);
-        verifyState(GL30.GL_VERTEX_ARRAY_BINDING, GLStateManager.ctx().defaultVAO, "GL_VERTEX_ARRAY_BINDING - Unbound");
+        verifyDefaultVaoBound("GL_VERTEX_ARRAY_BINDING - Unbound");
         verifyState(GL15.GL_ARRAY_BUFFER_BINDING, 0, "GL_ARRAY_BUFFER_BINDING - Unbound");
 
         verifyState(GL11.GL_VERTEX_ARRAY, defaultVertexEnabled, "GL_VERTEX_ARRAY - Reset");
@@ -196,6 +196,28 @@ public class GLSM_VAO_UnitTest {
             GLSMBuffers.glDeleteBuffers(vbo);
             UniversalVAO.deleteVertexArrays(vao);
         }
+    }
+
+    @Test
+    void vertexArraysGenerateAndDeleteThroughABuffer() {
+        final IntBuffer arrays = BufferUtils.createIntBuffer(2);
+        GL30.glGenVertexArrays(arrays);
+        final int first = arrays.get(0), second = arrays.get(1);
+        Assertions.assertNotEquals(first, second);
+        GL30.glBindVertexArray(first);
+        Assertions.assertTrue(GLSMVertexInput.glIsVertexArray(first));
+        GL30.glBindVertexArray(second);
+        Assertions.assertTrue(GLSMVertexInput.glIsVertexArray(second));
+        GL30.glBindVertexArray(0);
+        GL30.glDeleteVertexArrays(arrays);
+        Assertions.assertFalse(GLSMVertexInput.glIsVertexArray(first));
+        Assertions.assertFalse(GLSMVertexInput.glIsVertexArray(second));
+    }
+
+    /** The driver has the default VAO bound, which stands in for array 0 and is reported to callers as 0. */
+    private static void verifyDefaultVaoBound(String message) {
+        Assertions.assertEquals(GLStateManager.ctx().defaultVAO, GL11.glGetInteger(GL30.GL_VERTEX_ARRAY_BINDING), message + " - driver");
+        Assertions.assertEquals(0, GLSMQueries.glGetInteger(GL30.GL_VERTEX_ARRAY_BINDING), message + " - GLSM");
     }
 
     private static void testClientStates() {

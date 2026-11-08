@@ -258,7 +258,7 @@ public final class GLSMTextureLifetime {
     }
 
     /** Flush deferred deletes so the driver can recycle names. */
-    static void flushDeferredTextureDeletes() {
+    public static void flushDeferredTextureDeletes() {
         if (!splashComplete || deferredDeleteTextures.isEmpty()) return;
         if (Tracy.ENABLED) Tracy.beginZone(Z_TEX_FLUSH_DELETES);
         try {
