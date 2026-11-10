@@ -13,6 +13,7 @@ import java.nio.ByteOrder;
 import java.nio.FloatBuffer;
 import java.nio.IntBuffer;
 import java.nio.ShortBuffer;
+import java.util.Arrays;
 
 import static com.gtnewhorizons.angelica.glsm.backend.BackendManager.RENDER_BACKEND;
 
@@ -30,7 +31,23 @@ public class FeedbackManager {
     private static FloatBuffer feedbackBuffer;
     private static int feedbackBufferSize;
     private static int feedbackMask;
+    private static int feedbackType = GL11.GL_2D;
     private static int feedbackCount;
+
+    private static IntBuffer selectBuffer;
+    private static int selectCount;
+    private static int hitRecords;
+    private static boolean selectOverflow;
+    private static boolean hit;
+    private static float hitMinZ, hitMaxZ;
+    private static final int[] nameStack = new int[64];
+    private static int nameDepth;
+    private static float[] primitive = new float[64];
+    private static float[] clipScratch = new float[64];
+    private static int primitiveVertices;
+
+    private static int immediateMode;
+    private static int immediateCount;
 
     private static final Matrix4f mvpMatrix = new Matrix4f();
     private static final Vector4f clipVec = new Vector4f();
@@ -45,32 +62,184 @@ public class FeedbackManager {
     }
 
     public static boolean isFeedbackMode() {
-        return renderMode == GL11.GL_FEEDBACK;
+        return renderMode == GL11.GL_FEEDBACK || isSelecting();
     }
+
+    /** Only a native backend takes a select buffer, so on a GL driver nothing is intercepted. */
+    private static boolean isSelecting() {
+        return renderMode == GL11.GL_SELECT && selectBuffer != null;
+    }
+
+    /** Immediate draws normally bypass the draw calls this class intercepts; only the native backends route them here. */
+    public static boolean capturesImmediate() {
+        return isSelecting() || renderMode == GL11.GL_FEEDBACK && RENDER_BACKEND.isNative();
+    }
+
+    public static void immediateBegin(int mode) {
+        immediateMode = mode;
+        immediateCount = 0;
+    }
+
+    public static void immediateVertex(float x, float y, float z) {
+        readbackBuf.limit(readbackBuf.capacity());
+        if ((immediateCount + 1) * 12 > readbackBuf.capacity()) {
+            final ByteBuffer grown = ByteBuffer.allocateDirect(readbackBuf.capacity() * 2).order(ByteOrder.nativeOrder());
+            grown.put(0, readbackBuf, 0, immediateCount * 12);
+            readbackBuf = grown;
+        }
+        readbackBuf.putFloat(immediateCount * 12, x).putFloat(immediateCount * 12 + 4, y).putFloat(immediateCount * 12 + 8, z);
+        immediateCount++;
+    }
+
+    public static void processImmediate() {
+        computeMVP();
+        emitAllPrimitives(immediateMode, immediateCount, i -> i, 12);
+        immediateCount = 0;
+    }
+
+    public static void glSelectBuffer(IntBuffer buffer) {
+        if (renderMode == GL11.GL_SELECT) {
+            GLStateManager.LOGGER.error("glSelectBuffer called while already in selection mode");
+            return;
+        }
+        selectBuffer = buffer;
+    }
+
+    public static void glInitNames() {
+        if (!isSelecting()) return;
+        writeHit();
+        nameDepth = 0;
+    }
+
+    public static void glPushName(int name) {
+        if (!isSelecting()) return;
+        writeHit();
+        if (nameDepth < nameStack.length) nameStack[nameDepth++] = name;
+    }
+
+    public static void glPopName() {
+        if (!isSelecting()) return;
+        writeHit();
+        if (nameDepth > 0) nameDepth--;
+    }
+
+    public static void glLoadName(int name) {
+        if (!isSelecting()) return;
+        writeHit();
+        if (nameDepth > 0) nameStack[nameDepth - 1] = name;
+    }
+
+    /** A hit record: the name count, the depth range hit since the names last changed, then the names. */
+    private static void writeHit() {
+        if (!hit) return;
+        hit = false;
+        if (selectCount + 3 + nameDepth > selectBuffer.remaining()) {
+            selectOverflow = true;
+            return;
+        }
+        final int at = selectBuffer.position() + selectCount;
+        selectBuffer.put(at, nameDepth);
+        selectBuffer.put(at + 1, (int) (long) (hitMinZ * 4294967295.0));
+        selectBuffer.put(at + 2, (int) (long) (hitMaxZ * 4294967295.0));
+        for (int i = 0; i < nameDepth; i++) selectBuffer.put(at + 3 + i, nameStack[i]);
+        selectCount += 3 + nameDepth;
+        hitRecords++;
+    }
+
+    private static void selectVertex() {
+        if ((primitiveVertices + 1) * 4 > primitive.length) primitive = Arrays.copyOf(primitive, primitive.length * 2);
+        final int at = primitiveVertices++ * 4;
+        primitive[at] = clipVec.x;
+        primitive[at + 1] = clipVec.y;
+        primitive[at + 2] = clipVec.z;
+        primitive[at + 3] = clipVec.w;
+    }
+
+    /** Clips the assembled primitive to the view volume; whatever survives is a hit at that depth. */
+    private static void flushPrimitive() {
+        int count = primitiveVertices;
+        primitiveVertices = 0;
+        if (count == 0) return;
+        for (int plane = 0; plane < 6 && count > 0; plane++) count = clipAgainst(plane, count);
+        if (count == 0) return;
+        final ViewportState vp = GLSMRasterizer.getViewportState();
+        for (int i = 0; i < count; i++) {
+            final float ndc = primitive[i * 4 + 2] / primitive[i * 4 + 3];
+            final float z = (float) (vp.depthRangeNear + (vp.depthRangeFar - vp.depthRangeNear) * (ndc + 1.0) * 0.5);
+            hitMinZ = hit ? Math.min(hitMinZ, z) : z;
+            hitMaxZ = hit ? Math.max(hitMaxZ, z) : z;
+            hit = true;
+        }
+    }
+
+    /** One Sutherland-Hodgman pass in clip space, where plane 0-5 is w-x, w+x, w-y, w+y, w-z, w+z. */
+    private static int clipAgainst(int plane, int count) {
+        if ((count * 2 + 1) * 4 > clipScratch.length) clipScratch = new float[(count * 2 + 1) * 8];
+        int out = 0;
+        for (int i = 0; i < count; i++) {
+            final int a = i * 4, b = (i + 1) % count * 4;
+            final float da = planeDistance(plane, a), db = planeDistance(plane, b);
+            if (da >= 0) {
+                System.arraycopy(primitive, a, clipScratch, out++ * 4, 4);
+            }
+            if (da >= 0 != db >= 0) {
+                final float t = da / (da - db);
+                for (int c = 0; c < 4; c++) clipScratch[out * 4 + c] = primitive[a + c] + (primitive[b + c] - primitive[a + c]) * t;
+                out++;
+            }
+        }
+        if (out * 4 > primitive.length) primitive = new float[clipScratch.length];
+        System.arraycopy(clipScratch, 0, primitive, 0, out * 4);
+        return out;
+    }
+
+    private static float planeDistance(int plane, int vertex) {
+        final float value = primitive[vertex + plane / 2];
+        return primitive[vertex + 3] + (plane % 2 == 0 ? -value : value);
+    }
+
+    public static int nameStackDepth() { return nameDepth; }
+    public static int maxNameStackDepth() { return nameStack.length; }
+    public static int feedbackBufferSize() { return feedbackBuffer == null ? 0 : feedbackBufferSize; }
+    public static int feedbackBufferType() { return feedbackType; }
+    public static int selectionBufferSize() { return selectBuffer == null ? 0 : selectBuffer.remaining(); }
 
     public static int getRenderMode() {
         return renderMode;
     }
 
     public static void glFeedbackBuffer(int type, FloatBuffer buffer) {
+        if (type != GL11.GL_2D && type != GL11.GL_3D && type != GL11.GL_3D_COLOR && type != GL11.GL_3D_COLOR_TEXTURE && type != GL11.GL_4D_COLOR_TEXTURE) {
+            GLStateManager.recordError(GL11.GL_INVALID_ENUM);
+            return;
+        }
         if (renderMode == GL11.GL_FEEDBACK) {
-            GLStateManager.LOGGER.error("glFeedbackBuffer called while already in feedback mode");
+            GLStateManager.recordError(GL11.GL_INVALID_OPERATION);
             return;
         }
         feedbackBuffer = buffer;
         feedbackBufferSize = buffer.remaining();
+        feedbackType = type;
         feedbackMask = computeMask(type);
         feedbackCount = 0;
     }
 
     public static int glRenderMode(int mode) {
+        if (mode != GL11.GL_RENDER && mode != GL11.GL_SELECT && mode != GL11.GL_FEEDBACK) {
+            GLStateManager.recordError(GL11.GL_INVALID_ENUM);
+            return 0;
+        }
+        if (isSelecting()) writeHit();
         int result = switch (renderMode) {
             case GL11.GL_FEEDBACK -> (feedbackCount > feedbackBufferSize) ? -1 : feedbackCount;
-            case GL11.GL_RENDER, GL11.GL_SELECT -> 0;
+            case GL11.GL_SELECT -> selectOverflow ? -1 : hitRecords;
+            case GL11.GL_RENDER -> 0;
             default -> 0;
         };
 
-        if (mode == GL11.GL_SELECT) {
+        selectCount = hitRecords = nameDepth = 0;
+        selectOverflow = hit = false;
+        if (mode == GL11.GL_SELECT && selectBuffer == null) {
             GLStateManager.LOGGER.warn("glRenderMode(GL_SELECT): selection mode not emulated");
         }
 
@@ -87,6 +256,10 @@ public class FeedbackManager {
     }
 
     private static void feedbackToken(float token) {
+        if (isSelecting()) {
+            flushPrimitive();
+            return;
+        }
         if (feedbackCount < feedbackBufferSize) {
             feedbackBuffer.put(feedbackBuffer.position() + feedbackCount, token);
         }
@@ -115,6 +288,10 @@ public class FeedbackManager {
     private static void transformAndEmitVertex(float x, float y, float z) {
         clipVec.set(x, y, z, 1.0f);
         mvpMatrix.transform(clipVec);
+        if (isSelecting()) {
+            selectVertex();
+            return;
+        }
 
         final float w = clipVec.w;
         final float ndcX = clipVec.x / w;
@@ -403,10 +580,14 @@ public class FeedbackManager {
             default:
                 throw new UnsupportedOperationException("Feedback mode: unsupported primitive mode 0x" + Integer.toHexString(mode));
         }
+        if (isSelecting()) flushPrimitive();
     }
 
     static void reset() {
         renderMode = GL11.GL_RENDER;
+        selectBuffer = null;
+        selectCount = hitRecords = nameDepth = 0;
+        selectOverflow = hit = false;
         feedbackBuffer = null;
         feedbackBufferSize = 0;
         feedbackMask = 0;

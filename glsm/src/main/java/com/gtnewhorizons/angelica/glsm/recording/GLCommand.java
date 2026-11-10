@@ -108,6 +108,9 @@ public final class GLCommand {
     public static final int BIND_VAO = 121;
 
     // === Complex object reference ===
+    public static final int BLEND_EQUATION_SEPARATE = 122;  // [cmd:4][rgb:4][alpha:4] = 12
+    public static final int READ_BUFFER = 123;       // [cmd:4][mode:4] = 8
+    public static final int SAMPLE_COVERAGE = 124;   // [cmd:4][value:4][invert:4] = 12
     public static final int COMPLEX_REF = 255;       // [cmd:4][index:4] = 8 bytes
 
     /**
@@ -123,6 +126,9 @@ public final class GLCommand {
             case DEPTH_FUNC -> "DEPTH_FUNC";
             case SHADE_MODEL -> "SHADE_MODEL";
             case LOGIC_OP -> "LOGIC_OP";
+            case BLEND_EQUATION_SEPARATE -> "BLEND_EQUATION_SEPARATE";
+            case READ_BUFFER -> "READ_BUFFER";
+            case SAMPLE_COVERAGE -> "SAMPLE_COVERAGE";
             case MATRIX_MODE -> "MATRIX_MODE";
             case ACTIVE_TEXTURE -> "ACTIVE_TEXTURE";
             case USE_PROGRAM -> "USE_PROGRAM";

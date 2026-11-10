@@ -16,24 +16,24 @@ import org.lwjgl.opengl.GL13;
  * Packed-long fragment shader permutation key for FFP emulation.
  *
  * Layout:
- *   long[0]: global bits (14) + unit 0 (47 bits at offset 14)
- *   long[1..3]: unit 1..3 (47 bits each, low-aligned)
+ *   long[0]: global bits (14) + unit 0 (45 bits at offset 14) + flat shade (60), glint (61, 62), clip discard (63)
+ *   long[1..3]: unit 1..3 (45 bits each, low-aligned)
  * Only max(1, nrEnabledUnits) longs are significant.
  *
- * Per-unit packing (47 bits):
+ * Per-unit packing (45 bits):
  *   0:     enabled
  *   1-3:   mode (MODULATE=0..COMBINE=5)
  *   4:     needsEnvColor
- *   5-8:   combineRgb (encoded 0-7)
- *   9-12:  combineAlpha (encoded 0-7)
- *   13-14: scaleShiftRgb
- *   15-16: scaleShiftAlpha
- *   17-21: arg0 RGB (source:3 + operand:2)
- *   22-26: arg1 RGB
- *   27-31: arg2 RGB
- *   32-36: arg0 Alpha
- *   37-41: arg1 Alpha
- *   42-46: arg2 Alpha
+ *   5-7:   combineRgb (encoded 0-7)
+ *   8-10:  combineAlpha (encoded 0-7)
+ *   11-12: scaleShiftRgb
+ *   13-14: scaleShiftAlpha
+ *   15-19: arg0 RGB (source:3 + operand:2)
+ *   20-24: arg1 RGB
+ *   25-29: arg2 RGB
+ *   30-34: arg0 Alpha
+ *   35-39: arg1 Alpha
+ *   40-44: arg2 Alpha
  */
 public final class FragmentKey {
     public static final int TEX_ENV_MODULATE = 0;
@@ -80,6 +80,7 @@ public final class FragmentKey {
     private static final int GLOBAL_BITS = 14;
     private static final int BIT_COMBINED_GLINT = 61;
     private static final int BIT_GLINT_REPLACE_ALPHA = 62;
+    private static final int BIT_FLAT_SHADE = 60;
     private static final int BIT_CLIP_DISCARD = 63;
     private static final int BIT_FOG_MODE          = 0;  // 2 bits
     private static final int BIT_ALPHA_TEST        = 2;  // 1 bit
@@ -94,16 +95,16 @@ public final class FragmentKey {
     private static final int U_ENABLED         = 0;
     private static final int U_MODE            = 1;   // 3 bits
     private static final int U_NEEDS_ENV_COLOR = 4;   // 1 bit
-    private static final int U_COMBINE_RGB     = 5;   // 4 bits
-    private static final int U_COMBINE_ALPHA   = 9;   // 4 bits
-    private static final int U_SCALE_RGB       = 13;  // 2 bits
-    private static final int U_SCALE_ALPHA     = 15;  // 2 bits
-    private static final int U_ARG0_RGB        = 17;  // 5 bits (source:3 + operand:2)
-    private static final int U_ARG1_RGB        = 22;  // 5 bits
-    private static final int U_ARG2_RGB        = 27;  // 5 bits
-    private static final int U_ARG0_ALPHA      = 32;  // 5 bits
-    private static final int U_ARG1_ALPHA      = 37;  // 5 bits
-    private static final int U_ARG2_ALPHA      = 42;  // 5 bits
+    private static final int U_COMBINE_RGB     = 5;   // 3 bits
+    private static final int U_COMBINE_ALPHA   = 8;   // 3 bits
+    private static final int U_SCALE_RGB       = 11;  // 2 bits
+    private static final int U_SCALE_ALPHA     = 13;  // 2 bits
+    private static final int U_ARG0_RGB        = 15;  // 5 bits (source:3 + operand:2)
+    private static final int U_ARG1_RGB        = 20;  // 5 bits
+    private static final int U_ARG2_RGB        = 25;  // 5 bits
+    private static final int U_ARG0_ALPHA      = 30;  // 5 bits
+    private static final int U_ARG1_ALPHA      = 35;  // 5 bits
+    private static final int U_ARG2_ALPHA      = 40;  // 5 bits
 
     static final int MAX_UNITS = 4;
 
@@ -148,6 +149,10 @@ public final class FragmentKey {
 
         if (glCtx.lineStippleActive) {
             global |= (1L << BIT_LINE_STIPPLE);
+        }
+
+        if (glCtx.shadeModelState.getValue() == GL11.GL_FLAT) {
+            global |= (1L << BIT_FLAT_SHADE);
         }
 
         // Separate specular / color sum
@@ -200,8 +205,8 @@ public final class FragmentKey {
         if (mode == TEX_ENV_COMBINE) {
             final int combRgb = encodeCombineFunc(envState.combineRgb);
             final int combAlpha = encodeCombineFunc(envState.combineAlpha);
-            bits |= ((long) (combRgb & 0xF)) << U_COMBINE_RGB;
-            bits |= ((long) (combAlpha & 0xF)) << U_COMBINE_ALPHA;
+            bits |= ((long) (combRgb & 0x7)) << U_COMBINE_RGB;
+            bits |= ((long) (combAlpha & 0x7)) << U_COMBINE_ALPHA;
             bits |= ((long) (encodeScale(envState.scaleRgb) & 0x3)) << U_SCALE_RGB;
             bits |= ((long) (encodeScale(envState.scaleAlpha) & 0x3)) << U_SCALE_ALPHA;
 
@@ -270,6 +275,7 @@ public final class FragmentKey {
     public boolean separateSpecular() { return ((packed[0] >> BIT_SEPARATE_SPECULAR) & 1) != 0; }
     public boolean colorSum()         { return ((packed[0] >> BIT_COLOR_SUM) & 1) != 0; }
     public boolean lineStipple()      { return ((packed[0] >> BIT_LINE_STIPPLE) & 1) != 0; }
+    public boolean flatShade()        { return ((packed[0] >>> BIT_FLAT_SHADE) & 1) != 0; }
     public int nrEnabledUnits()       { return packed.length == 1 && !unitEnabled(0) ? 0 : packed.length; }
     public boolean overlayEnabled()   { return ((packed[0] >> BIT_OVERLAY_ENABLED) & 1) != 0; }
     public boolean overlayInstanced() { return ((packed[0] >> BIT_OVERLAY_INSTANCED) & 1) != 0; }
@@ -281,8 +287,8 @@ public final class FragmentKey {
     public boolean unitEnabled(int i)       { return (unitBits(i) & 1) != 0; }
     public int unitMode(int i)              { return (int) ((unitBits(i) >> U_MODE) & 0x7); }
     public boolean unitNeedsEnvColor(int i) { return ((unitBits(i) >> U_NEEDS_ENV_COLOR) & 1) != 0; }
-    public int unitCombineRgb(int i)        { return (int) ((unitBits(i) >> U_COMBINE_RGB) & 0xF); }
-    public int unitCombineAlpha(int i)      { return (int) ((unitBits(i) >> U_COMBINE_ALPHA) & 0xF); }
+    public int unitCombineRgb(int i)        { return (int) ((unitBits(i) >> U_COMBINE_RGB) & 0x7); }
+    public int unitCombineAlpha(int i)      { return (int) ((unitBits(i) >> U_COMBINE_ALPHA) & 0x7); }
     public int unitScaleShiftRgb(int i)     { return (int) ((unitBits(i) >> U_SCALE_RGB) & 0x3); }
     public int unitScaleShiftAlpha(int i)   { return (int) ((unitBits(i) >> U_SCALE_ALPHA) & 0x3); }
 

@@ -12,11 +12,13 @@ import com.gtnewhorizons.angelica.glsm.GLSMQueries;
 import com.gtnewhorizons.angelica.glsm.GLSMRasterizer;
 import com.gtnewhorizons.angelica.glsm.GLSMTextures;
 import com.gtnewhorizons.angelica.glsm.GLSMVertexInput;
+import com.gtnewhorizons.angelica.glsm.GLStateManager;
 import org.lwjgl.BufferUtils;
 import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL12;
 import org.lwjgl.opengl.GL13;
 import org.lwjgl.opengl.GL14;
+import org.lwjgl.opengl.GL20;
 
 import java.nio.ByteBuffer;
 import java.nio.FloatBuffer;
@@ -155,11 +157,17 @@ public class GLSMUtil {
         if (isFFPOnly(glCap)) {
             assertEquals(expected, GLSMQueries.glGetInteger(glCap), message + " - GLSM State Mismatch");
         } else {
+            // GLSM keeps a stencil mask as it was set, while Mesa reports an all-ones mask as INT_MAX; only the bits the buffer has matter.
+            final int significant = isStencilMask(glCap) ? GLStateManager.ctx().stencilBitMask : ~0;
             assertAll(message,
-                () -> assertEquals(expected, GL11.glGetInteger(glCap), "GL State Mismatch"),
-                () -> assertEquals(expected, GLSMQueries.glGetInteger(glCap), "GLSM State Mismatch")
+                () -> assertEquals(expected & significant, GL11.glGetInteger(glCap) & significant, "GL State Mismatch"),
+                () -> assertEquals(expected & significant, GLSMQueries.glGetInteger(glCap) & significant, "GLSM State Mismatch")
             );
         }
+    }
+
+    private static boolean isStencilMask(int glCap) {
+        return glCap == GL11.GL_STENCIL_VALUE_MASK || glCap == GL11.GL_STENCIL_WRITEMASK || glCap == GL20.GL_STENCIL_BACK_VALUE_MASK || glCap == GL20.GL_STENCIL_BACK_WRITEMASK;
     }
 
     public static void verifyState(int glCap, short expected, String message) {

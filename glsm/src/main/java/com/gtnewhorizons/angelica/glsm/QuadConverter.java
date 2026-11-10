@@ -21,16 +21,20 @@ import static com.gtnewhorizons.angelica.glsm.backend.BackendManager.RENDER_BACK
 /**
  * Shared quad-to-triangle EBO for core profile GL_QUADS emulation.
  *
- * <p>Maintains a single growable element buffer with pre-computed indices mapping
- * GL_QUADS vertex order to GL_TRIANGLES: {@code (0,1,3, 1,2,3)} per quad.
- * Uses {@code GL_LAST_VERTEX_CONVENTION} winding (Mesa {@code do_quad} LAST path)
- * so both emitted triangles share the quad's provoking vertex (v3).
+ * <p>Maintains growable element buffers with pre-computed indices mapping GL_QUADS vertex order to GL_TRIANGLES.
+ * A smooth-shaded quad splits along v0-v2, {@code (0,1,2, 2,3,0)}, as NVIDIA's driver, Mesa's llvmpipe and GTNHLib's
+ * display lists do: the diagonal decides how colours blend across the quad, which smooth lighting relies on. A flat-shaded
+ * quad splits along v1-v3, {@code (0,1,3, 1,2,3)} (Mesa {@code do_quad} LAST path), so both triangles take their colour
+ * from v3, the quad's provoking vertex.
  */
 public final class QuadConverter {
     public static final int INDEX_TYPE = GL11.GL_UNSIGNED_INT;
 
-    private static int eboId;
-    private static int maxQuads;
+    static final int[] SMOOTH = {0, 1, 2, 2, 3, 0};
+    static final int[] FLAT = {0, 1, 3, 1, 2, 3};
+
+    private static final int[] eboIds = new int[2];
+    private static final int[] maxQuads = new int[2];
 
     /** Scratch EBO for converted quad-element draws (drawQuadElementsAsTriangles). */
     private static int scratchEboId;
@@ -38,17 +42,28 @@ public final class QuadConverter {
 
     private QuadConverter() {}
 
-    private static void ensureCapacity(int quadCount) {
-        if (quadCount <= maxQuads) return;
+    /** The split for the current shade model. */
+    public static int[] pattern(GLContextState glCtx) {
+        return glCtx.shadeModelState.getValue() == GL11.GL_FLAT ? FLAT : SMOOTH;
+    }
+
+    /** The split display lists bake, matching GTNHLib's quad index buffer. */
+    public static int[] compiledPattern() {
+        return SMOOTH;
+    }
+
+    private static int ensureCapacity(int[] pattern, int quadCount) {
+        final int which = pattern == FLAT ? 1 : 0;
+        if (quadCount <= maxQuads[which]) return eboIds[which];
 
         // Round up to power of 2 for amortized growth
-        int newMaxQuads = Math.max(256, maxQuads);
+        int newMaxQuads = Math.max(256, maxQuads[which]);
         while (newMaxQuads < quadCount) {
             newMaxQuads *= 2;
         }
 
-        if (eboId == 0) {
-            eboId = RENDER_BACKEND.genBuffers();
+        if (eboIds[which] == 0) {
+            eboIds[which] = RENDER_BACKEND.genBuffers();
         }
 
         // Generate index data: 6 ints per quad
@@ -56,23 +71,16 @@ public final class QuadConverter {
         long ptr = memAddress0(indexData);
         for (int i = 0; i < newMaxQuads; i++) {
             final int base = i * 4;
-            // GL_LAST_VERTEX_CONVENTION: both triangles share v3 as provoking vertex
-            // Triangle 1: 0, 1, 3
-            memPutInt(ptr, base);
-            memPutInt(ptr + 4, base + 1);
-            memPutInt(ptr + 8, base + 3);
-            // Triangle 2: 1, 2, 3
-            memPutInt(ptr + 12, base + 1);
-            memPutInt(ptr + 16, base + 2);
-            memPutInt(ptr + 20, base + 3);
+            for (int k = 0; k < 6; k++) memPutInt(ptr + k * 4L, base + pattern[k]);
             ptr += 24;
         }
 
-        RENDER_BACKEND.bindBuffer(GL15.GL_ELEMENT_ARRAY_BUFFER, eboId);
+        RENDER_BACKEND.bindBuffer(GL15.GL_ELEMENT_ARRAY_BUFFER, eboIds[which]);
         RENDER_BACKEND.bufferData(GL15.GL_ELEMENT_ARRAY_BUFFER, indexData, GL15.GL_STATIC_DRAW);
 
         memFree(indexData);
-        maxQuads = newMaxQuads;
+        maxQuads[which] = newMaxQuads;
+        return eboIds[which];
     }
 
     /**
@@ -94,6 +102,7 @@ public final class QuadConverter {
 
     private static void drawSharedQuadEbo(GLContextState glCtx, int first, int vertexCount, int primcount, boolean instanced) {
         final int quadCount = vertexCount / 4;
+        final int[] pattern = pattern(glCtx);
         if ((first & 3) != 0) {
             misalignedDraws++;
             if ((misalignedDraws & (misalignedDraws - 1)) == 0) {
@@ -103,12 +112,7 @@ public final class QuadConverter {
             long ptr = memAddress0(dst);
             for (int i = 0; i < quadCount; i++) {
                 final int base = first + i * 4;
-                memPutInt(ptr, base);
-                memPutInt(ptr + 4, base + 1);
-                memPutInt(ptr + 8, base + 3);
-                memPutInt(ptr + 12, base + 1);
-                memPutInt(ptr + 16, base + 2);
-                memPutInt(ptr + 20, base + 3);
+                for (int k = 0; k < 6; k++) memPutInt(ptr + k * 4L, base + pattern[k]);
                 ptr += 24;
             }
             uploadAndDraw(glCtx, dst, quadCount * 6, GL11.GL_UNSIGNED_INT, 4, primcount, instanced);
@@ -116,8 +120,8 @@ public final class QuadConverter {
         }
         GLSMDraws.preDraw(glCtx, GL11.GL_TRIANGLES);
         final int prevEbo = glCtx.vaos.boundEBO;
-        ensureCapacity(first / 4 + quadCount);
-        RENDER_BACKEND.bindBuffer(GL15.GL_ELEMENT_ARRAY_BUFFER, eboId);
+        final int ebo = ensureCapacity(pattern, first / 4 + quadCount);
+        RENDER_BACKEND.bindBuffer(GL15.GL_ELEMENT_ARRAY_BUFFER, ebo);
         // Index offset: first vertex / 4 quads * 6 indices * 4 bytes per int
         final long indexOffset = (long) (first / 4) * 6 * 4;
         if (instanced) {
@@ -126,6 +130,28 @@ public final class QuadConverter {
             RENDER_BACKEND.drawElements(GL11.GL_TRIANGLES, quadCount * 6, INDEX_TYPE, indexOffset);
         }
         RENDER_BACKEND.bindBuffer(GL15.GL_ELEMENT_ARRAY_BUFFER, prevEbo);
+    }
+
+    /**
+     * Convert a GL_QUAD_STRIP glDrawArrays call to indexed GL_TRIANGLES. Each quad (2i, 2i+1, 2i+3, 2i+2) splits from its
+     * first vertex, as drivers draw it, into triangles that both end on 2i+3, the quad's provoking vertex.
+     */
+    public static void drawQuadStripAsTriangles(GLContextState glCtx, int first, int vertexCount, int primcount, boolean instanced) {
+        final int quadCount = vertexCount < 4 ? 0 : (vertexCount - 2) / 2;
+        if (quadCount == 0) return;
+        final ByteBuffer dst = memAlloc(quadCount * 6 * 4);
+        long ptr = memAddress0(dst);
+        for (int i = 0; i < quadCount; i++) {
+            final int a = first + 2 * i, b = a + 1, c = a + 2, d = a + 3;
+            memPutInt(ptr, a);
+            memPutInt(ptr + 4, b);
+            memPutInt(ptr + 8, d);
+            memPutInt(ptr + 12, c);
+            memPutInt(ptr + 16, a);
+            memPutInt(ptr + 20, d);
+            ptr += 24;
+        }
+        uploadAndDraw(glCtx, dst, quadCount * 6, GL11.GL_UNSIGNED_INT, 4, primcount, instanced);
     }
 
     /**
@@ -200,7 +226,7 @@ public final class QuadConverter {
         RENDER_BACKEND.getBufferSubData(GL15.GL_ELEMENT_ARRAY_BUFFER, offset, src);
 
         final ByteBuffer dst = memAlloc(triIndexCount * 4);
-        triangulateQuads(memAddress0(src), type, memAddress0(dst), GL11.GL_UNSIGNED_INT, quadCount);
+        triangulateQuads(memAddress0(src), type, memAddress0(dst), GL11.GL_UNSIGNED_INT, quadCount, 0, pattern(glCtx));
 
         memFree(src);
         uploadAndDraw(glCtx, dst, triIndexCount, GL11.GL_UNSIGNED_INT, 4, primcount, instanced);
@@ -218,7 +244,7 @@ public final class QuadConverter {
 
         final ByteBuffer dst = memAlloc(triIndexCount * 4);
         final long srcAddr = memAddress0(indices) + (long) indices.position() * 4;
-        triangulateQuads(srcAddr, GL11.GL_UNSIGNED_INT, memAddress0(dst), GL11.GL_UNSIGNED_INT, quadCount);
+        triangulateQuads(srcAddr, GL11.GL_UNSIGNED_INT, memAddress0(dst), GL11.GL_UNSIGNED_INT, quadCount, 0, pattern(glCtx));
 
         uploadAndDraw(glCtx, dst, triIndexCount, GL11.GL_UNSIGNED_INT, 4);
     }
@@ -235,7 +261,7 @@ public final class QuadConverter {
 
         final ByteBuffer dst = memAlloc(triIndexCount * 2);
         final long srcAddr = memAddress0(indices) + (long) indices.position() * 2;
-        triangulateQuads(srcAddr, GL11.GL_UNSIGNED_SHORT, memAddress0(dst), GL11.GL_UNSIGNED_SHORT, quadCount);
+        triangulateQuads(srcAddr, GL11.GL_UNSIGNED_SHORT, memAddress0(dst), GL11.GL_UNSIGNED_SHORT, quadCount, 0, pattern(glCtx));
 
         uploadAndDraw(glCtx, dst, triIndexCount, GL11.GL_UNSIGNED_SHORT, 2);
     }
@@ -251,7 +277,7 @@ public final class QuadConverter {
         final long srcAddr = memAddress0(indices) + indices.position();
 
         final ByteBuffer dst = memAlloc(triIndexCount * 4);
-        triangulateQuads(srcAddr, type, memAddress0(dst), GL11.GL_UNSIGNED_INT, quadCount);
+        triangulateQuads(srcAddr, type, memAddress0(dst), GL11.GL_UNSIGNED_INT, quadCount, 0, pattern(glCtx));
 
         uploadAndDraw(glCtx, dst, triIndexCount, GL11.GL_UNSIGNED_INT, 4);
     }
@@ -282,9 +308,7 @@ public final class QuadConverter {
 
     /**
      * Read {@code quadCount} quads from {@code srcAddr} and emit 6 triangle indices
-     * per quad at {@code dstAddr} using {@code GL_LAST_VERTEX_CONVENTION}:
-     * {@code (a,b,d), (b,c,d)}. v3 is the provoking vertex for both triangles;
-     * diagonal runs b→d. Matches Mesa's {@code do_quad} LAST path.
+     * per quad at {@code dstAddr}, split as display lists bake them ({@link #compiledPattern()}).
      *
      * <p>Caller allocates dst of size {@code quadCount * 6 * sizeof(dstType)}.
      *
@@ -302,18 +326,16 @@ public final class QuadConverter {
      * one pass.
      */
     public static void triangulateQuads(long srcAddr, int srcType, long dstAddr, int dstType, int quadCount, int minVtx) {
+        triangulateQuads(srcAddr, srcType, dstAddr, dstType, quadCount, minVtx, compiledPattern());
+    }
+
+    /** Same, with the split given: {@link #pattern(GLContextState)} for a draw made now. */
+    public static void triangulateQuads(long srcAddr, int srcType, long dstAddr, int dstType, int quadCount, int minVtx, int[] pattern) {
+        final int[] v = new int[4];
         for (int i = 0; i < quadCount; i++) {
-            final int a = readIndex(srcAddr, srcType, i * 4)     - minVtx;
-            final int b = readIndex(srcAddr, srcType, i * 4 + 1) - minVtx;
-            final int c = readIndex(srcAddr, srcType, i * 4 + 2) - minVtx;
-            final int d = readIndex(srcAddr, srcType, i * 4 + 3) - minVtx;
+            for (int k = 0; k < 4; k++) v[k] = readIndex(srcAddr, srcType, i * 4 + k) - minVtx;
             final int o = i * 6;
-            writeIndex(dstAddr, dstType, o,     a);
-            writeIndex(dstAddr, dstType, o + 1, b);
-            writeIndex(dstAddr, dstType, o + 2, d);
-            writeIndex(dstAddr, dstType, o + 3, b);
-            writeIndex(dstAddr, dstType, o + 4, c);
-            writeIndex(dstAddr, dstType, o + 5, d);
+            for (int k = 0; k < 6; k++) writeIndex(dstAddr, dstType, o + k, v[pattern[k]]);
         }
     }
 

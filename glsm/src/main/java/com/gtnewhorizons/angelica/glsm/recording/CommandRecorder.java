@@ -138,6 +138,26 @@ public final class CommandRecorder {
         writeInt(mode);
     }
 
+    public void writeBlendEquationSeparate(int modeRGB, int modeAlpha) {
+        ensureCapacity(12);
+        writeInt(GLCommand.BLEND_EQUATION_SEPARATE);
+        writeInt(modeRGB);
+        writeInt(modeAlpha);
+    }
+
+    public void writeReadBuffer(int mode) {
+        ensureCapacity(8);
+        writeInt(GLCommand.READ_BUFFER);
+        writeInt(mode);
+    }
+
+    public void writeSampleCoverage(float value, boolean invert) {
+        ensureCapacity(12);
+        writeInt(GLCommand.SAMPLE_COVERAGE);
+        writeInt(Float.floatToRawIntBits(value));
+        writeInt(invert ? 1 : 0);
+    }
+
     public void writeLogicOp(int opcode) {
         ensureCapacity(8);
         writeInt(GLCommand.LOGIC_OP);

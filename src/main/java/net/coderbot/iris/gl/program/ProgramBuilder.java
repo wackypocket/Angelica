@@ -85,12 +85,15 @@ public class ProgramBuilder extends ProgramUniforms.Builder implements SamplerHo
 		if (tessEval != null) shaders.add(tessEval);
 		shaders.add(fragment);
 
-		int programId = ProgramCreator.create(name, cacheKey, shaders.toArray(new GlShader[0]));
-		initializeFallbackUniforms(programId);
-
-		for (GlShader shader : shaders) {
-			shader.destroy();
+		final int programId;
+		try {
+			programId = ProgramCreator.create(name, cacheKey, shaders.toArray(new GlShader[0]));
+		} finally {
+			for (GlShader shader : shaders) {
+				shader.destroy();
+			}
 		}
+		initializeFallbackUniforms(programId);
 
 		return new ProgramBuilder(name, programId, reservedTextureUnits).retainAs(sources);
 	}
@@ -158,9 +161,12 @@ public class ProgramBuilder extends ProgramUniforms.Builder implements SamplerHo
 
 		GlShader compute = buildShader(ShaderType.COMPUTE, name + ".csh", source);
 
-		int programId = ProgramCreator.create(name, cacheKey, compute);
-
-		compute.destroy();
+		final int programId;
+		try {
+			programId = ProgramCreator.create(name, cacheKey, compute);
+		} finally {
+			compute.destroy();
+		}
 
 		return new ProgramBuilder(name, programId, reservedTextureUnits).retainAs(sources);
 	}

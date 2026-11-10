@@ -5,6 +5,7 @@ import com.gtnewhorizon.gtnhlib.config.ConfigurationManager;
 import com.gtnewhorizon.gtnhmixins.IEarlyMixinLoader;
 import com.gtnewhorizon.gtnhmixins.builders.IMixins;
 import com.gtnewhorizon.gtnhmixins.builders.ITransformers;
+import com.gtnewhorizons.angelica.glemu.NativeGate;
 import com.gtnewhorizons.angelica.config.AngelicaConfig;
 import com.gtnewhorizons.angelica.config.CompatConfig;
 import com.gtnewhorizons.angelica.config.FontConfig;
@@ -73,11 +74,22 @@ public final class AngelicaClientTweaker implements IFMLLoadingPlugin, IEarlyMix
             // Angelica Config
             ConfigurationManager.registerConfig(AngelicaConfig.class);
             TracyOptions.latch(AngelicaConfig.enableTracy, AngelicaConfig.tracyAllowRemote, AngelicaConfig.tracyFineZones, AngelicaConfig.tracyMaxSrcLocs);
-            if (BackendStartGuard.begin(new File(Launch.minecraftHome, "angelica"), AngelicaConfig.sdlGpuConfigured(), SystemProperties.SDL_GPU_OVERRIDE != null, SDLGPUGate.REQUIREMENTS_REVISION, BackendOptions.sdlGpuDriver(AngelicaConfig.sdlGpuDriverName()))) {
+            if (!AngelicaConfig.renderBackend.isSelectable() && !Boolean.TRUE.equals(BackendOptions.nativeOverride())) {
+                LOGGER.warn("Render backend {} needs {}; running on OpenGL", AngelicaConfig.renderBackend, AngelicaConfig.renderBackend.requiredFlag());
+                RenderBackendChoice.reject(AngelicaConfig.renderBackend);
+                AngelicaConfig.renderBackend = RenderBackendChoice.OPENGL;
+            }
+            final boolean nativeBackend = AngelicaConfig.nativeConfigured();
+            final NativeGate gate = nativeBackend ? NativeGates.forDriver(BackendOptions.nativeDriver(AngelicaConfig.nativeDriverName())) : null;
+            // The start guard is keyed by the chosen backend's requirements revision and driver, so changing either starts a fresh strike count.
+            final int guardRevision = gate == null ? SDLGPUGate.REQUIREMENTS_REVISION : gate.requirementsRevision();
+            final String guardKey = gate == null ? BackendOptions.sdlGpuDriver(AngelicaConfig.sdlGpuDriverName()) : gate.guardKey();
+            if (BackendStartGuard.begin(new File(Launch.minecraftHome, "angelica"), AngelicaConfig.sdlGpuConfigured() || nativeBackend,
+                SystemProperties.SDL_GPU_OVERRIDE != null || BackendOptions.nativeOverride() != null, guardRevision, guardKey)) {
                 AngelicaConfig.renderBackend = RenderBackendChoice.OPENGL;
                 ConfigurationManager.save(AngelicaConfig.class);
             }
-            BackendOptions.latch(AngelicaConfig.sdlGpuConfigured(), AngelicaConfig.sdlGpuDriverName(), AngelicaConfig.glVersion);
+            BackendOptions.latch(AngelicaConfig.sdlGpuConfigured(), AngelicaConfig.nativeConfigured(), AngelicaConfig.sdlGpuDriverName(), AngelicaConfig.nativeDriverName(), AngelicaConfig.glVersion);
             ConfigurationManager.registerConfig(CompatConfig.class);
             ConfigurationManager.registerConfig(FontConfig.class);
             MCPatcherForgeConfig.registerConfig();
@@ -99,6 +111,7 @@ public final class AngelicaClientTweaker implements IFMLLoadingPlugin, IEarlyMix
             DependencyVerifier.gtnhLibChecks("Angelica"), LOGGER,
             (title, message) -> MissingDependencySdl.showFatal(title, message));
 
+        for (NativeGate gate : NativeGates.ALL) logNativeRequest(gate);
         if (BackendOptions.sdlGpuRequested()) {
             if (SDLGPUGate.isSDLGPUAvailable()) {
                 LOGGER.info("SDL GPU window mode enabled");
@@ -181,6 +194,12 @@ public final class AngelicaClientTweaker implements IFMLLoadingPlugin, IEarlyMix
                 }
             }
         }
+    }
+
+    private static void logNativeRequest(NativeGate gate) {
+        if (!gate.isRequested()) return;
+        if (gate.isAvailable()) LOGGER.info("Native renderer requested on {}", gate.apiName());
+        else LOGGER.warn("Native renderer unavailable on {}, running on OpenGL: {}", gate.apiName(), gate.missingRequirement());
     }
 
     /** Publish a transformer-narrowing toggle to the blackboard; read by AngelicaLateTweaker.narrowEnabled(). */

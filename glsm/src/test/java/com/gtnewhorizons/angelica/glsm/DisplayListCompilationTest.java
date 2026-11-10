@@ -10,7 +10,6 @@ import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @GLCompatTest
@@ -69,17 +68,16 @@ class DisplayListCompilationTest {
     }
 
     @Test
-    void glsm_unsupportedOpInList_abortsCleanly() {
+    void glsm_readBufferInList_staysRecording() {
         testList = GL11.glGenLists(1);
         GLSMDraws.glNewList(testList, GL11.GL_COMPILE);
         assertTrue(DisplayListManager.isRecording(), "recording after glNewList");
 
-        assertThrows(UnsupportedOperationException.class, () -> GLSMFramebuffer.glReadBuffer(GL11.GL_FRONT));
-
-        assertFalse(DisplayListManager.isRecording(), "recording state must be reset after an in-list throw");
-        assertEquals(DisplayListManager.RecordMode.NONE, DisplayListManager.getRecordMode());
-
         assertDoesNotThrow(() -> GLSMFramebuffer.glReadBuffer(GL11.GL_FRONT));
+
+        assertTrue(DisplayListManager.isRecording(), "glReadBuffer is recorded into the list, which stays open");
+        assertEquals(DisplayListManager.RecordMode.COMPILE, DisplayListManager.getRecordMode());
+
         assertDoesNotThrow(GLSMDraws::glEndList);
         GLSMFramebuffer.glReadBuffer(GL11.GL_BACK);
     }

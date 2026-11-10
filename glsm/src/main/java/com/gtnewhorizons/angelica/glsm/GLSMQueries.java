@@ -15,6 +15,8 @@ import org.lwjgl.opengl.GL21;
 import org.lwjgl.opengl.GL30;
 import org.lwjgl.opengl.GL31;
 import org.lwjgl.opengl.GL33;
+import org.lwjgl.opengl.GL40;
+import org.lwjgl.opengl.GL41;
 import org.lwjgl.opengl.GL42;
 import org.lwjgl.opengl.GL43;
 import java.nio.ByteBuffer;
@@ -42,6 +44,7 @@ public final class GLSMQueries {
     private GLSMQueries() {}
 
     public static boolean glGetBoolean(int pname) {
+        if (!RENDER_BACKEND.checks().glGetBooleanv(pname)) return false;
         rejectExitCapture();
         return glGetBoolean(ctx(), pname);
     }
@@ -135,6 +138,7 @@ public final class GLSMQueries {
     }
 
     public static void glGetBoolean(int pname, ByteBuffer params) {
+        if (!RENDER_BACKEND.checks().glGetBooleanv(pname)) return;
         rejectExitCapture();
         final GLContextState glCtx = ctx();
         if (!isCachingEnabled()) {
@@ -174,6 +178,7 @@ public final class GLSMQueries {
             case GL11.GL_ALPHA_TEST_FUNC -> glCtx.alphaState.getFunction();
             case GL11.GL_DEPTH_FUNC -> glCtx.depthState.getFunc();
             case GL11.GL_LIST_BASE -> glCtx.listBase;
+            case GL14.GL_FOG_COORDINATE_SOURCE -> glCtx.fogCoordSource;
             case GL11.GL_LIST_MODE -> DisplayListManager.getListMode();
             case GL11.GL_MATRIX_MODE -> glCtx.matrixMode.getMode();
             case GL11.GL_SHADE_MODEL -> glCtx.shadeModelState.getValue();
@@ -204,7 +209,8 @@ public final class GLSMQueries {
             case GL20.GL_BLEND_EQUATION_ALPHA -> glCtx.blendState.getEquationAlpha();
 
             case GL11.GL_LOGIC_OP_MODE -> glCtx.logicOpMode.getValue();
-            case GL11.GL_DRAW_BUFFER -> glCtx.drawBuffer.getValue();
+            // Each framebuffer has its own, and only the default framebuffer's is cached.
+            case GL11.GL_DRAW_BUFFER -> glCtx.drawFramebuffer != 0 ? RENDER_BACKEND.getInteger(pname) : glCtx.drawBuffer.getValue();
 
             case GL11.GL_STENCIL_FUNC -> glCtx.stencilState.getFuncFront();
             case GL11.GL_STENCIL_REF -> glCtx.stencilState.getRefFront();
@@ -222,7 +228,8 @@ public final class GLSMQueries {
 
             case GL20.GL_CURRENT_PROGRAM -> glCtx.activeProgram;
 
-            case GL30.GL_VERTEX_ARRAY_BINDING -> glCtx.boundVAO;
+            // The default VAO that stands in for a core context's array 0 is reported as 0.
+            case GL30.GL_VERTEX_ARRAY_BINDING -> glCtx.boundVAO == glCtx.defaultVAO ? 0 : glCtx.boundVAO;
 
             case GL30.GL_DRAW_FRAMEBUFFER_BINDING -> glCtx.drawFramebuffer;
             case GL30.GL_READ_FRAMEBUFFER_BINDING -> glCtx.readFramebuffer;
@@ -263,7 +270,7 @@ public final class GLSMQueries {
 
     public static void glGetInteger(int pname, IntBuffer params) {
         rejectExitCapture();
-        if (!isCachingEnabled()) {
+        if (!isCachingEnabled() || pname == GL13.GL_COMPRESSED_TEXTURE_FORMATS || pname == GL40.GL_PATCH_DEFAULT_OUTER_LEVEL || pname == GL40.GL_PATCH_DEFAULT_INNER_LEVEL) {
             RENDER_BACKEND.getInteger(pname, params);
             return;
         }
@@ -271,6 +278,14 @@ public final class GLSMQueries {
         switch (pname) {
             case GL11.GL_VIEWPORT -> ctx().viewportState.get(params);
             case GL11.GL_SCISSOR_BOX -> ctx().scissorState.get(params);
+            case GL11.GL_COLOR_WRITEMASK -> {
+                final GLContextState glCtx = ctx();
+                final int pos = params.position();
+                params.put(pos, glCtx.colorMask.red ? GL11.GL_TRUE : GL11.GL_FALSE);
+                params.put(pos + 1, glCtx.colorMask.green ? GL11.GL_TRUE : GL11.GL_FALSE);
+                params.put(pos + 2, glCtx.colorMask.blue ? GL11.GL_TRUE : GL11.GL_FALSE);
+                params.put(pos + 3, glCtx.colorMask.alpha ? GL11.GL_TRUE : GL11.GL_FALSE);
+            }
             case GL11.GL_POLYGON_MODE -> {
                 final PolygonState polygon = ctx().polygonState;
                 final int pos = params.position();
@@ -291,14 +306,18 @@ public final class GLSMQueries {
     public static void glGetFloat(int pname, FloatBuffer params) {
         rejectExitCapture();
         final GLContextState glCtx = ctx();
-        if (!isCachingEnabled()) {
+        if (!isCachingEnabled() || pname == GL40.GL_PATCH_DEFAULT_OUTER_LEVEL || pname == GL40.GL_PATCH_DEFAULT_INNER_LEVEL) {
             RENDER_BACKEND.getFloat(pname, params);
             return;
         }
 
         switch (pname) {
+            case GL41.GL_VIEWPORT_BOUNDS_RANGE -> RENDER_BACKEND.getFloat(pname, params);
             case GL11.GL_MODELVIEW_MATRIX -> glCtx.modelViewMatrix.get(params.position(), params);
             case GL11.GL_PROJECTION_MATRIX -> glCtx.projectionMatrix.get(params.position(), params);
+            case GL13.GL_TRANSPOSE_MODELVIEW_MATRIX -> glCtx.modelViewMatrix.getTransposed(params.position(), params);
+            case GL13.GL_TRANSPOSE_PROJECTION_MATRIX -> glCtx.projectionMatrix.getTransposed(params.position(), params);
+            case GL13.GL_TRANSPOSE_TEXTURE_MATRIX -> glCtx.textures.getTextureUnitMatrix(GLSMTextures.getActiveTextureUnit()).getTransposed(params.position(), params);
             case GL11.GL_TEXTURE_MATRIX -> glCtx.textures.getTextureUnitMatrix(GLSMTextures.getActiveTextureUnit()).get(params.position(), params);
             case GL11.GL_COLOR_CLEAR_VALUE -> glCtx.clearColor.get(params);
             case GL11.GL_CURRENT_COLOR -> glCtx.color.get(params);
@@ -377,6 +396,7 @@ public final class GLSMQueries {
         return switch (pname) {
             case GL11.GL_ALPHA_TEST_REF -> glCtx.alphaState.getReference();
             case GL11.GL_FOG_DENSITY -> glCtx.fogState.getDensity();
+            case GL11.GL_FOG_INDEX -> glCtx.fogIndex;
             case GL11.GL_FOG_START -> glCtx.fogState.getStart();
             case GL11.GL_FOG_END -> glCtx.fogState.getEnd();
             case GL11.GL_DEPTH_CLEAR_VALUE -> (float) glCtx.depthState.getClearValue();
@@ -426,11 +446,17 @@ public final class GLSMQueries {
         final int pos = params.position();
         switch (pname) {
             case GL11.GL_DEPTH_CLEAR_VALUE -> params.put(pos, glCtx.depthState.getClearValue());
+            case GL11.GL_VIEWPORT, GL11.GL_SCISSOR_BOX -> {
+                final IntBuffer box = BufferUtils.createIntBuffer(16);
+                glGetInteger(pname, box);
+                for (int i = 0; i < 4; i++) params.put(pos + i, box.get(i));
+            }
             case GL11.GL_DEPTH_RANGE -> {
                 params.put(pos, glCtx.viewportState.depthRangeNear);
                 params.put(pos + 1, glCtx.viewportState.depthRangeFar);
             }
-            case GL11.GL_MODELVIEW_MATRIX, GL11.GL_PROJECTION_MATRIX, GL11.GL_TEXTURE_MATRIX -> widenFromFloat(pname, params, 16);
+            case GL11.GL_MODELVIEW_MATRIX, GL11.GL_PROJECTION_MATRIX, GL11.GL_TEXTURE_MATRIX, GL13.GL_TRANSPOSE_MODELVIEW_MATRIX,
+                GL13.GL_TRANSPOSE_PROJECTION_MATRIX, GL13.GL_TRANSPOSE_TEXTURE_MATRIX -> widenFromFloat(pname, params, 16);
             case GL11.GL_COLOR_CLEAR_VALUE, GL11.GL_CURRENT_COLOR, GL11.GL_CURRENT_TEXTURE_COORDS, GL11.GL_FOG_COLOR,
                 GL11.GL_LIGHT_MODEL_AMBIENT, GL14.GL_BLEND_COLOR, GL14.GL_CURRENT_SECONDARY_COLOR -> widenFromFloat(pname, params, 4);
             case GL11.GL_CURRENT_NORMAL, GL14.GL_POINT_DISTANCE_ATTENUATION -> widenFromFloat(pname, params, 3);
@@ -473,6 +499,12 @@ public final class GLSMQueries {
         rejectExitCapture();
         if (!RENDER_BACKEND.hasContext()) return 0;
         if (initConfig.isNoErrorChecks()) return 0;
+        final GLContextState glCtx = ctx();
+        if (glCtx.pendingError != GL11.GL_NO_ERROR) {
+            final int error = glCtx.pendingError;
+            glCtx.pendingError = GL11.GL_NO_ERROR;
+            return error;
+        }
         return RENDER_BACKEND.getError();
     }
 
@@ -532,6 +564,15 @@ public final class GLSMQueries {
                     ctx().scissorState.get(params);
                 }
             }
+            case GL11.GL_COLOR_WRITEMASK -> {
+                final GLContextState glCtx = ctx();
+                params[0] = glCtx.colorMask.red ? GL11.GL_TRUE : GL11.GL_FALSE;
+                if (params.length > 3) {
+                    params[1] = glCtx.colorMask.green ? GL11.GL_TRUE : GL11.GL_FALSE;
+                    params[2] = glCtx.colorMask.blue ? GL11.GL_TRUE : GL11.GL_FALSE;
+                    params[3] = glCtx.colorMask.alpha ? GL11.GL_TRUE : GL11.GL_FALSE;
+                }
+            }
             case GL11.GL_POLYGON_MODE -> {
                 final PolygonState polygon = ctx().polygonState;
                 params[0] = polygon.getFrontMode();
@@ -565,6 +606,7 @@ public final class GLSMQueries {
     }
 
     public static int glGetInteger(int pname, int index) {
+        if (!RENDER_BACKEND.checks().glGetIntegeri_v(pname, index)) return 0;
         rejectExitCapture();
         return indexedIntegerOrBackend(pname, index);
     }
@@ -579,11 +621,13 @@ public final class GLSMQueries {
     }
 
     public static void glGetIntegeri_v(int pname, int index, IntBuffer params) {
+        if (!RENDER_BACKEND.checks().glGetIntegeri_v(pname, index)) return;
         rejectExitCapture();
         params.put(params.position(), indexedIntegerOrBackend(pname, index));
     }
 
     public static void glGetBooleani_v(int pname, int index, ByteBuffer params) {
+        if (!RENDER_BACKEND.checks().glGetBooleani_v(pname, index)) return;
         rejectExitCapture();
         params.put(params.position(), (byte) (indexedIntegerOrBackend(pname, index) != 0 ? GL11.GL_TRUE : GL11.GL_FALSE));
     }

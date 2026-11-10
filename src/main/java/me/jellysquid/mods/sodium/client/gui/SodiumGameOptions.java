@@ -19,6 +19,7 @@ import net.coderbot.iris.Iris;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.OpenGlHelper;
 import net.minecraft.client.renderer.texture.TextureMap;
+import net.minecraft.client.settings.GameSettings;
 import net.minecraft.util.MathHelper;
 import org.embeddedt.embeddium.impl.render.chunk.occlusion.AsyncOcclusionMode;
 
@@ -43,7 +44,11 @@ public class SodiumGameOptions {
     public final AdvancedSettings advanced = new AdvancedSettings();
     public final PerformanceSettings performance = new PerformanceSettings();
     public final ReducerSettings reducer = new ReducerSettings();
+    // The slider maximum the saved FPS limits were written against. Older configs lack it.
+    public int framerateScale;
     private Path configPath;
+    /** The file on disk did not parse: it is left for the player to fix until they save settings themselves. */
+    private transient boolean unreadableOnDisk;
 
     public static void recordAtlasMipmapClamp(int requestedMipmapLevels, int actualMipmapLevels) {
         resourcePackMipmapCeiling = actualMipmapLevels < requestedMipmapLevels ? actualMipmapLevels : Integer.MAX_VALUE;
@@ -125,11 +130,13 @@ public class SodiumGameOptions {
         if (Files.exists(path)) {
             try (FileReader reader = new FileReader(path.toFile())) {
                 config = GSON.fromJson(reader, SodiumGameOptions.class);
+                if (config != null) config.advanced.migrateLegacyFields();
             } catch (IOException e) {
                 throw new RuntimeException("Could not parse config", e);
             } catch (JsonSyntaxException e) {
                 AngelicaMod.LOGGER.error("Could not parse config, will fallback to default settings", e);
                 config = new SodiumGameOptions();
+                config.unreadableOnDisk = true;
                 resaveConfig = false;
             }
         } else {
@@ -179,6 +186,20 @@ public class SodiumGameOptions {
         return config;
     }
 
+    public boolean isUnreadableOnDisk() {
+        return unreadableOnDisk;
+    }
+
+    /** Moves limits saved against an older slider range onto the current one; false if they were already on it. */
+    public boolean migrateFramerateScale(GameSettings settings) {
+        if (this.framerateScale == FrameRateOptions.MAX_FRAMERATE) return false;
+        this.framerateScale = FrameRateOptions.MAX_FRAMERATE;
+        settings.limitFramerate = FrameRateOptions.migrateLegacyLimit(settings.limitFramerate);
+        this.reducer.unfocusedFpsLimit = FrameRateOptions.migrateLegacyLimit(this.reducer.unfocusedFpsLimit);
+        this.reducer.idleFpsLimit = FrameRateOptions.migrateLegacyLimit(this.reducer.idleFpsLimit);
+        return true;
+    }
+
     private static boolean isLwjgl2() {
         return SodiumGameOptions.class.getClassLoader().getResource("org/lwjgl/Sys.class") != null;
     }
@@ -197,6 +218,7 @@ public class SodiumGameOptions {
         }
 
         Files.writeString(this.configPath, GSON.toJson(this));
+        this.unreadableOnDisk = false;
         if (Iris.enabled) {
             try {
                 if (Iris.getIrisConfig() != null) {
@@ -209,7 +231,8 @@ public class SodiumGameOptions {
     }
 
     public static class AdvancedSettings {
-        public VSyncMode vsyncMode;
+        public VSyncMode presentMode;
+        @Deprecated public VSyncMode vsyncMode; // the pre-present-mode name, saved until its VSync choice has been taken
         public boolean useVertexArrayObjects = true;
         public MultiDrawMode multiDrawMode = MultiDrawMode.DIRECT;
 
@@ -218,6 +241,18 @@ public class SodiumGameOptions {
         public boolean ignoreDriverBlacklist = false;
         public StreamingUploader.UploadStrategy streamingUploadStrategy = StreamingUploader.UploadStrategy.MAP_BUFFER_RANGE;
         public boolean enableDeferredBatching = true;
+
+        void migrateLegacyFields() {
+            if (presentMode == null && vsyncMode != null && vsyncMode.tearFree()) presentMode = vsyncMode;
+        }
+
+        /** The VSync choice carried over from the legacy vsyncMode, or null. Returns it once. */
+        public Boolean takeMigratedVsync() {
+            if (vsyncMode == null) return null;
+            final boolean enabled = vsyncMode.tearFree();
+            vsyncMode = null;
+            return enabled;
+        }
     }
 
     public static class PerformanceSettings {

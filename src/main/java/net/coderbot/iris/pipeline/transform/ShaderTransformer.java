@@ -238,7 +238,7 @@ public class ShaderTransformer {
         final ShaderDiskCache.Key k = ShaderDiskCache.key("iris-transform").str(patch.name());
         parameters.appendDiskKey(k);
         k.i(RenderSystem.getMaxGlslVersion()).b(RenderSystem.supportsSSBO()).b(RenderSystem.supportsImageLoadStore())
-            .b(RenderSystem.isGLES()).b(RenderSystem.isClipDistanceEmulated()).b(BackendManager.RENDER_BACKEND.isSDLGPU()).b(BackendManager.RENDER_BACKEND.supportsComputeImageAtomics()).str(RwImageStoreExtractor.atomicCustomImagesKey())
+            .b(RenderSystem.isGLES()).b(RenderSystem.isClipDistanceEmulated()).b(BackendManager.RENDER_BACKEND.isSDLGPU()).b(BackendManager.RENDER_BACKEND.isNative()).b(BackendManager.RENDER_BACKEND.supportsComputeImageAtomics()).str(RwImageStoreExtractor.atomicCustomImagesKey())
             .i(maxSupportedHoistVersion);
         if (enabledRequirements == null) {
             k.i(-1);
@@ -429,7 +429,7 @@ public class ShaderTransformer {
         if (canEmitImageOps()) {
             SamplerToStorageImageRewriter.transformGrouped(computeTypes, parameters);
         }
-        if (BackendManager.RENDER_BACKEND.isSDLGPU()) {
+        if (BackendManager.RENDER_BACKEND.emulatesGL()) {
             LocalZeroInitTransformer.transformGrouped(computeTypes);
         }
 
@@ -530,7 +530,7 @@ public class ShaderTransformer {
         if (canEmitImageOps()) {
             SamplerToStorageImageRewriter.transformGrouped(types, parameters);
         }
-        if (BackendManager.RENDER_BACKEND.isSDLGPU()) {
+        if (BackendManager.RENDER_BACKEND.emulatesGL()) {
             LocalZeroInitTransformer.transformGrouped(types);
         }
         for (var entry : types.entrySet()) {

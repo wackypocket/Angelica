@@ -28,6 +28,7 @@ import static com.gtnewhorizons.angelica.glsm.GLStateManager.RETAINED_SLOT;
 import static com.gtnewhorizons.angelica.glsm.GLStateManager.beforeUncapturedStateChange;
 import static com.gtnewhorizons.angelica.glsm.GLStateManager.ctx;
 import static com.gtnewhorizons.angelica.glsm.GLStateManager.primaryContext;
+import static com.gtnewhorizons.angelica.glsm.GLStateManager.recordError;
 import static com.gtnewhorizons.angelica.glsm.GLStateManager.rejectExitCapture;
 import static com.gtnewhorizons.angelica.glsm.GLStateManager.warnOnce;
 import static com.gtnewhorizons.angelica.glsm.backend.BackendManager.RENDER_BACKEND;
@@ -82,6 +83,10 @@ public final class GLSMAttribStack {
     public static void glPopClientAttrib() {
         rejectExitCapture();
         final GLContextState glCtx = ctx();
+        if (glCtx.clientAttribStackPointer <= 0) {
+            recordError(GL11.GL_STACK_UNDERFLOW);
+            return;
+        }
         if (glCtx.clientAttribStackPointer > 0) {
             final int sp = --glCtx.clientAttribStackPointer;
             final int mask = glCtx.clientAttribSavedMask[sp];
@@ -631,6 +636,11 @@ public final class GLSMAttribStack {
                 return;
             }
         }
+        if (ctx().attribDepth >= MAX_ATTRIB_STACK_DEPTH) {
+            rejectExitCapture();
+            recordError(GL11.GL_STACK_OVERFLOW);
+            return;
+        }
         GLDebug.pushGroup("pushState");
         pushState(mask);
     }
@@ -646,6 +656,7 @@ public final class GLSMAttribStack {
         if (ctx().attribDepth == 0) {
             rejectExitCapture();
             warnOnce("popattrib-underflow", "glPopAttrib called with an empty attrib stack; ignoring");
+            recordError(GL11.GL_STACK_UNDERFLOW);
             return;
         }
         GLDebug.popGroup();

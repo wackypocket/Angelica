@@ -21,8 +21,10 @@ import static com.gtnewhorizons.angelica.glsm.backend.BackendManager.RENDER_BACK
 
 public final class VAOManager {
     public static final int MAX_ATTRIBS = 16;
+    private static final int DENSE_LIMIT = 1 << 16; // VAO ids are small and dense, so binds index an array instead of hashing
 
     public final Int2ObjectOpenHashMap<VAOData> vaoMap = new Int2ObjectOpenHashMap<>();
+    private VAOData[] dense = new VAOData[256];
 
     final Int2ObjectOpenHashMap<VAOData> eboOwners = new Int2ObjectOpenHashMap<>();
 
@@ -108,6 +110,14 @@ public final class VAOManager {
         return isLegal(LEGAL_TYPES[conv], MIN_SIZE[conv], MAX_SIZE[conv], conv == CONV_COLOR || conv == CONV_SECONDARY_COLOR, size, type);
     }
 
+    /** The error for a client array pointer this refuses: a bad size, an unknown type, or BGRA with a type other than unsigned bytes. */
+    public static int conventionalError(int conv, int size, int type) {
+        // The size before the type, as NVIDIA looks at them.
+        if (size != GL12.GL_BGRA && (size < MIN_SIZE[conv] || size > MAX_SIZE[conv])) return GL11.GL_INVALID_VALUE;
+        if ((LEGAL_TYPES[conv] & typeBit(type)) == 0) return GL11.GL_INVALID_ENUM;
+        return GL11.GL_INVALID_OPERATION;
+    }
+
     public static boolean isLegalGeneric(int index, int size, int type, boolean integer) {
         return index >= 0 && index < MAX_ATTRIBS && isLegal(integer ? T_INTEGER : T_GENERIC, 1, 4, !integer, size, type);
     }
@@ -190,7 +200,7 @@ public final class VAOManager {
         final VAOData data = new VAOData();
         current = data;
         currentAttribs = data.attribs;
-        vaoMap.put(defaultVAO, data);
+        putVao(defaultVAO, data);
     }
 
     public boolean isInitialized() {
@@ -219,10 +229,10 @@ public final class VAOManager {
             current.arrayVersion = arrayVersion;
         }
 
-        VAOData data = vaoMap.get(vaoId);
+        VAOData data = vaoId >= 0 && vaoId < dense.length ? dense[vaoId] : vaoMap.get(vaoId);
         if (data == null) {
             data = new VAOData();
-            vaoMap.put(vaoId, data);
+            putVao(vaoId, data);
         }
         current = data;
         currentVertexFlags = data.vertexFlags;
@@ -236,9 +246,17 @@ public final class VAOManager {
         arrayVersion = data.arrayVersion;
     }
 
+    private void putVao(int vaoId, VAOData data) {
+        vaoMap.put(vaoId, data);
+        if (vaoId < 0 || vaoId >= DENSE_LIMIT) return;
+        if (vaoId >= dense.length) dense = Arrays.copyOf(dense, Math.min(DENSE_LIMIT, Math.max(vaoId + 1, dense.length * 2)));
+        dense[vaoId] = data;
+    }
+
     public void onDeleteVertexArray(int vaoId) {
         final VAOData data = vaoMap.remove(vaoId);
         if (data == null) return;
+        if (vaoId >= 0 && vaoId < dense.length) dense[vaoId] = null;
         removeEboOwner(data.ebo, data);
         if (data == current) current = null;
     }
@@ -671,16 +689,43 @@ public final class VAOManager {
     private int clientArraysVBOCapacity = 0;
     private final int[] clientArraysVBOOffsets = new int[VAOManager.MAX_ATTRIBS];
 
-    public void uploadClientArraysToVBO() {
-        int totalBytes = 0;
+    private final int[] clientArraysBytes = new int[VAOManager.MAX_ATTRIBS];
+
+    /** What a client array holds for {@code vertexEnd} vertices, or all of it when that is -1. */
+    private static long clientBytes(Attrib a, int vertexEnd) {
+        final int remaining = a.clientPointer.remaining();
+        if (vertexEnd < 0) return remaining;
+        if (vertexEnd == 0) return 0;
+        final int components = a.size == org.lwjgl.opengl.GL12.GL_BGRA ? 4 : a.size;
+        final int element = isPackedType(a.type) ? 4 : components * GLTypes.sizeBytes(a.type);
+        final int stride = a.stride != 0 ? a.stride : element;
+        return Math.min(remaining, (long) (vertexEnd - 1) * stride + element);
+    }
+
+    private static boolean isPackedType(int type) {
+        return type == org.lwjgl.opengl.GL12.GL_UNSIGNED_INT_2_10_10_10_REV || type == org.lwjgl.opengl.GL33.GL_INT_2_10_10_10_REV
+            || type == org.lwjgl.opengl.GL30.GL_UNSIGNED_INT_10F_11F_11F_REV;
+    }
+
+    /** Above this, client memory is a bare pointer of unknown length, uploadable only when the draw says how far it reads. */
+    private static final int UNKNOWN_LENGTH = Integer.MAX_VALUE / 2;
+
+    public void uploadClientArraysToVBO(int vertexEnd) {
+        long totalBytes = 0;
         for (int i = 0; i < VAOManager.MAX_ATTRIBS; i++) {
             clientArraysVBOOffsets[i] = -1;
             final VAOManager.Attrib a = currentAttribs[i];
             if (a == null || !a.enabled || a.clientPointer == null) continue;
-            clientArraysVBOOffsets[i] = totalBytes;
-            totalBytes += a.clientPointer.remaining();
+            final long bytes = clientBytes(a, vertexEnd);
+            if (bytes > UNKNOWN_LENGTH) {
+                GLStateManager.warnOnce("client-array-unbounded", "A draw that does not say how many vertices it reads used client memory given as a bare pointer; the array is skipped");
+                continue;
+            }
+            clientArraysVBOOffsets[i] = (int) totalBytes;
+            clientArraysBytes[i] = (int) bytes;
+            totalBytes += bytes;
         }
-        if (totalBytes == 0) return;
+        if (totalBytes == 0 || totalBytes > UNKNOWN_LENGTH) return;
 
         if (clientArraysVBO == 0) {
             clientArraysVBO = RENDER_BACKEND.genBuffers();
@@ -690,16 +735,18 @@ public final class VAOManager {
         GLSMBuffers.glBindBuffer(GL15.GL_ARRAY_BUFFER, clientArraysVBO);
 
         if (totalBytes > clientArraysVBOCapacity) {
-            int newCap = Math.max(4096, clientArraysVBOCapacity);
+            long newCap = Math.max(4096, clientArraysVBOCapacity);
             while (newCap < totalBytes) newCap *= 2;
-            clientArraysVBOCapacity = newCap;
+            clientArraysVBOCapacity = (int) Math.min(newCap, Integer.MAX_VALUE);
         }
         RENDER_BACKEND.bufferData(GL15.GL_ARRAY_BUFFER, clientArraysVBOCapacity, GL15.GL_STREAM_DRAW);
 
         for (int i = 0; i < VAOManager.MAX_ATTRIBS; i++) {
             if (clientArraysVBOOffsets[i] < 0) continue;
             final VAOManager.Attrib a = currentAttribs[i];
-            RENDER_BACKEND.bufferSubData(GL15.GL_ARRAY_BUFFER, clientArraysVBOOffsets[i], a.clientPointer.duplicate());
+            final ByteBuffer data = a.clientPointer.duplicate();
+            data.limit(data.position() + clientArraysBytes[i]);
+            RENDER_BACKEND.bufferSubData(GL15.GL_ARRAY_BUFFER, clientArraysVBOOffsets[i], data);
             if (a.integer) {
                 RENDER_BACKEND.vertexAttribIPointer(i, a.size, a.type, a.stride, (long) clientArraysVBOOffsets[i]);
             } else {

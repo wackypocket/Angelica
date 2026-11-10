@@ -98,6 +98,7 @@ public class BatchingFontRenderer {
     private final int AAStrength;
     private final int fontBrightness;
     private final int alphaTestRefLocation;
+    private final int nearestLevel0Location;
     private final int mvpMatrixLocation;
     private final int lightmapLocation;
     private final int lightmapSamplerLocation;
@@ -145,6 +146,7 @@ public class BatchingFontRenderer {
         AAStrength = GLSMPrograms.glGetUniformLocation(fontShaderId, "strength");
         fontBrightness = GLSMPrograms.glGetUniformLocation(fontShaderId, "fontBrightness");
         alphaTestRefLocation = GLSMPrograms.glGetUniformLocation(fontShaderId, "alphaTestRef");
+        nearestLevel0Location = GLSMPrograms.glGetUniformLocation(fontShaderId, "nearestLevel0");
         mvpMatrixLocation = GLSMPrograms.glGetUniformLocation(fontShaderId, "u_MVPMatrix");
         lightmapLocation = GLSMPrograms.glGetUniformLocation(fontShaderId, "u_Lightmap");
         lightmapSamplerLocation = GLSMPrograms.glGetUniformLocation(fontShaderId, "lightmap");
@@ -964,6 +966,11 @@ public class BatchingFontRenderer {
         truncateBatchToWatermark();
     }
 
+    private static boolean nearestLevel0() {
+        return GLSMTextures.glGetTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MIN_FILTER) == GL11.GL_NEAREST
+            && GLSMTextures.glGetTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MAG_FILTER) == GL11.GL_NEAREST;
+    }
+
     private static float preprocessAAStrength() {
         return FontConfig.fontAAStrength / 120.f;
     }
@@ -1093,6 +1100,8 @@ public class BatchingFontRenderer {
                 }
                 if (cmd.texture != 0) {
                     bindIntTexture(owner, cmd.texture);
+                    // The AA filter reads each texel once where the atlas has no filtering or mipmaps that a sample could see.
+                    if (FontConfig.fontAAMode > 0) GLSMPrograms.glUniform1i(owner.nearestLevel0Location, nearestLevel0() ? 1 : 0);
                 }
                 flushLastTexture = cmd.texture;
             }

@@ -12,7 +12,9 @@ import com.gtnewhorizons.angelica.glsm.backend.BackendManager;
 import com.gtnewhorizons.angelica.glsm.backend.BackendOptions;
 import com.gtnewhorizons.angelica.glsm.backend.BackendStartGuard;
 import com.gtnewhorizons.angelica.glsm.backend.MoltenVK;
+import com.gtnewhorizons.angelica.metal.MetalGate;
 import com.gtnewhorizons.angelica.sdlgpu.SDLGPUGate;
+import com.gtnewhorizons.angelica.vulkan.VulkanGate;
 import me.flashyreese.mods.reeses_sodium_options.client.gui.ReeseSodiumVideoOptionsScreen;
 import me.jellysquid.mods.sodium.client.gui.options.ActionOption;
 import me.jellysquid.mods.sodium.client.gui.options.OptionFlag;
@@ -26,6 +28,7 @@ import net.minecraft.util.EnumChatFormatting;
 import net.minecraft.util.Util;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.function.Supplier;
 
@@ -36,7 +39,9 @@ public class RendererOptionPages {
     public static OptionPage renderer() {
         final Util.EnumOS os = Util.getOSType();
         final boolean sdlAvailable = SDLGPUGate.isSDLGPUAvailable();
-        final RenderBackendChoice[] backends = sdlAvailable ? RenderBackendChoice.values() : new RenderBackendChoice[] { RenderBackendChoice.OPENGL };
+        final RenderBackendChoice[] backends = Arrays.stream(RenderBackendChoice.values())
+            .filter(b -> b.isSelectable() && runsHere(b) || b == shownBackend())
+            .toArray(RenderBackendChoice[]::new);
         final SdlGpuDriver[] drivers = allowedDrivers(os);
         final GLVersionChoice[] glVersions = allowedGlVersions(glVersionCeiling(os));
         final String active = activeLabel();
@@ -49,32 +54,36 @@ public class RendererOptionPages {
             status.add(ActionOption.label(I18n.format("options.angelica.renderer.moltenvk"), I18n.format("options.angelica.renderer.moltenvk.tooltip"), () -> moltenVk));
         }
 
-        return new OptionPage(I18n.format("options.angelica.renderer.page"), ImmutableList.of(
-            OptionGroup.createBuilder()
-                .add(OptionImpl.createBuilder(RenderBackendChoice.class, angelicaOpts)
+        final OptionImpl<AngelicaConfig, RenderBackendChoice> backend = OptionImpl.createBuilder(RenderBackendChoice.class, angelicaOpts)
                         .setName(I18n.format("options.angelica.renderer.backend"))
-                        .setTooltip(overrideTooltip(backendTooltip(sdlAvailable), SystemProperties.KEY_USE_SDL_GPU, SystemProperties.SDL_GPU_OVERRIDE != null))
+                        .setTooltip(overrideTooltip(backendTooltip(os, sdlAvailable), BackendOptions.nativeOverride() != null ? nativeOverrideKey() : SystemProperties.KEY_USE_SDL_GPU,
+                            SystemProperties.SDL_GPU_OVERRIDE != null || BackendOptions.nativeOverride() != null))
                         .setControl(o -> new CyclingControl<>(o, RenderBackendChoice.class, backends))
-                        .setBinding((opts, value) -> AngelicaConfig.renderBackend = value, opts -> backendOf(SystemProperties.SDL_GPU_OVERRIDE != null ? SystemProperties.SDL_GPU_OVERRIDE : AngelicaConfig.sdlGpuConfigured()))
-                        .setEnabled(SystemProperties.SDL_GPU_OVERRIDE == null)
+                        .setBinding((opts, value) -> AngelicaConfig.renderBackend = value, opts -> shownBackend())
+                        .setEnabled(SystemProperties.SDL_GPU_OVERRIDE == null && BackendOptions.nativeOverride() == null)
                         .setFlags(OptionFlag.REQUIRES_GAME_RESTART)
-                        .build())
-                .add(OptionImpl.createBuilder(SdlGpuDriver.class, angelicaOpts)
+                        .build();
+        // Each backend's own selector is shown only while that backend is the pending choice above.
+        final OptionImpl<AngelicaConfig, SdlGpuDriver> sdlDriver = OptionImpl.createBuilder(SdlGpuDriver.class, angelicaOpts)
                         .setName(I18n.format("options.angelica.renderer.driver"))
                         .setTooltip(overrideTooltip(driverTooltip(os), SystemProperties.KEY_SDL_GPU_DRIVER, SystemProperties.SDL_GPU_DRIVER_OVERRIDE != null))
                         .setControl(o -> new CyclingControl<>(o, SdlGpuDriver.class, drivers))
                         .setBinding((opts, value) -> AngelicaConfig.sdlGpuDriver = value, opts -> shownDriver())
                         .setEnabled(SystemProperties.SDL_GPU_DRIVER_OVERRIDE == null)
                         .setFlags(OptionFlag.REQUIRES_GAME_RESTART)
-                        .build())
-                .add(OptionImpl.createBuilder(GLVersionChoice.class, angelicaOpts)
+                        .build();
+        sdlDriver.angelica$dynamicallyShow(() -> backend.getValue() == RenderBackendChoice.SDL_GPU);
+        final OptionImpl<AngelicaConfig, GLVersionChoice> glVersion = OptionImpl.createBuilder(GLVersionChoice.class, angelicaOpts)
                         .setName(I18n.format("options.angelica.renderer.glVersion"))
                         .setTooltip(I18n.format("options.angelica.renderer.glVersion.tooltip"))
                         .setControl(o -> new CyclingControl<>(o, GLVersionChoice.class, glVersions, glVersionNames()))
                         .setBinding((opts, value) -> AngelicaConfig.glVersion = value.version(), opts -> GLVersionChoice.of(AngelicaConfig.glVersion, GLVersionChoice.GL46.version()))
                         .setFlags(OptionFlag.REQUIRES_GAME_RESTART)
-                        .build())
-                .build(),
+                        .build();
+        glVersion.angelica$dynamicallyShow(() -> backend.getValue() == RenderBackendChoice.OPENGL);
+
+        return new OptionPage(I18n.format("options.angelica.renderer.page"), ImmutableList.of(
+            OptionGroup.createBuilder().add(backend).add(sdlDriver).add(glVersion).build(),
             status.build()));
     }
 
@@ -90,8 +99,29 @@ public class RendererOptionPages {
             .build());
     }
 
+    // Vulkan stays listed even without its requirements; the tooltip says what is missing and startup falls back to OpenGL.
+    private static boolean runsHere(RenderBackendChoice backend) {
+        return switch (backend) {
+            case SDL_GPU -> SDLGPUGate.isSDLGPUAvailable();
+            case METAL -> MetalGate.GATE.isAvailable();
+            default -> true;
+        };
+    }
+
     private static RenderBackendChoice backendOf(boolean sdlGpu) {
         return sdlGpu ? RenderBackendChoice.SDL_GPU : RenderBackendChoice.OPENGL;
+    }
+
+    private static String nativeOverrideKey() {
+        if (SystemProperties.METAL_OVERRIDE != null) return SystemProperties.KEY_USE_METAL;
+        return SystemProperties.KEY_USE_VULKAN;
+    }
+
+    private static RenderBackendChoice shownBackend() {
+        final Boolean forced = BackendOptions.nativeOverride();
+        if (Boolean.TRUE.equals(forced)) return RenderBackendChoice.fromNativeDriver(BackendOptions.nativeDriver(""));
+        if (forced == null && AngelicaConfig.nativeConfigured() && !Boolean.TRUE.equals(SystemProperties.SDL_GPU_OVERRIDE)) return AngelicaConfig.renderBackend;
+        return backendOf(SystemProperties.SDL_GPU_OVERRIDE != null ? SystemProperties.SDL_GPU_OVERRIDE : AngelicaConfig.sdlGpuConfigured());
     }
 
     private static SdlGpuDriver shownDriver() {
@@ -131,9 +161,13 @@ public class RendererOptionPages {
         return names;
     }
 
-    private static String backendTooltip(boolean sdlAvailable) {
-        final String base = EnumChatFormatting.RED + I18n.format("options.angelica.renderer.backend.experimental") + EnumChatFormatting.RESET + " " + I18n.format("options.angelica.renderer.backend.tooltip");
-        return sdlAvailable ? base : base + " " + I18n.format("options.angelica.renderer.backend.unavailable", SDLGPUGate.missingRequirement());
+    private static String backendTooltip(Util.EnumOS os, boolean sdlAvailable) {
+        final String base = EnumChatFormatting.RED + I18n.format("options.angelica.renderer.backend.testing") + EnumChatFormatting.RESET + " " + I18n.format("options.angelica.renderer.backend.tooltip");
+        final String withMoltenVk = os == Util.EnumOS.OSX ? base + " " + I18n.format("options.angelica.renderer.backend.tooltip.macos") : base;
+        final String withVulkan = VulkanGate.GATE.isAvailable() ? withMoltenVk : withMoltenVk + " " + I18n.format("options.angelica.renderer.backend.vulkan.unavailable", VulkanGate.GATE.missingRequirement());
+        if (!RenderBackendChoice.SDL_GPU.isSelectable()) return withVulkan;
+        final String withExperimental = withVulkan + " " + EnumChatFormatting.RED + I18n.format("options.angelica.renderer.backend.experimental") + EnumChatFormatting.RESET + " " + I18n.format("options.angelica.renderer.backend.tooltip.experimental");
+        return sdlAvailable ? withExperimental : withExperimental + " " + I18n.format("options.angelica.renderer.backend.unavailable", SDLGPUGate.missingRequirement());
     }
 
     private static String driverTooltip(Util.EnumOS os) {
@@ -149,23 +183,30 @@ public class RendererOptionPages {
         final String restartLabel = I18n.format("options.angelica.status.restart");
         final String forcedLabel = I18n.format("options.angelica.renderer.status.forced");
         final String failedLabel = I18n.format("options.angelica.renderer.status.failed");
+        final String nativeFailedLabel = I18n.format("options.angelica.renderer.status.nativeFailed");
         final String activeLabel = I18n.format("options.angelica.renderer.status.active");
         final String resetLabel = I18n.format("options.angelica.renderer.status.reset");
+        final RenderBackendChoice rejected = RenderBackendChoice.rejected();
+        final String rejectedLabel = rejected == null ? "" : I18n.format("options.angelica.renderer.status.rejected", rejected.requiredFlag());
         return () -> {
             if (AngelicaConfig.sdlGpuConfigured() != BackendOptions.configSdlGpu()
+                || AngelicaConfig.nativeConfigured() != BackendOptions.configNative()
                 || !AngelicaConfig.sdlGpuDriverName().equals(BackendOptions.configDriver())
+                || !AngelicaConfig.nativeDriverName().equals(BackendOptions.configNativeDriver())
                 || AngelicaConfig.glVersion != BackendOptions.configGlVersion()) {
                 return restartLabel;
             }
-            if (BackendStartGuard.tripped() && !AngelicaConfig.sdlGpuConfigured()) return resetLabel;
+            if (rejected != null && AngelicaConfig.renderBackend == RenderBackendChoice.OPENGL) return rejectedLabel;
+            if (BackendStartGuard.tripped() && !AngelicaConfig.sdlGpuConfigured() && !AngelicaConfig.nativeConfigured()) return resetLabel;
+            if (BackendOptions.nativeRequested() && !BackendManager.RENDER_BACKEND.isNative()) return nativeFailedLabel;
             if (BackendOptions.sdlGpuRequested() && !BackendManager.RENDER_BACKEND.isSDLGPU()) return failedLabel;
-            return SystemProperties.SDL_GPU_OVERRIDE != null || SystemProperties.SDL_GPU_DRIVER_OVERRIDE != null ? forcedLabel : activeLabel;
+            return SystemProperties.SDL_GPU_OVERRIDE != null || SystemProperties.SDL_GPU_DRIVER_OVERRIDE != null || BackendOptions.nativeOverride() != null ? forcedLabel : activeLabel;
         };
     }
 
     private static String activeLabel() {
         final String name = GLStateManager.getRenderBackendName();
-        return BackendManager.RENDER_BACKEND.isSDLGPU() ? name : name + " " + RenderSystem.getGlMajor() + "." + RenderSystem.getGlMinor();
+        return BackendManager.RENDER_BACKEND.emulatesGL() ? name : name + " " + RenderSystem.getGlMajor() + "." + RenderSystem.getGlMinor();
     }
 
     static String overrideTooltip(String base, String flag, boolean overridden) {

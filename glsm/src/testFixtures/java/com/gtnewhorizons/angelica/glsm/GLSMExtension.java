@@ -95,7 +95,8 @@ public class GLSMExtension implements BeforeAllCallback, BeforeEachCallback, Aft
             System.out.println("OpenGL Version: " + glVersion);
 
             final int profileMask = GL11.glGetInteger(GL32.GL_CONTEXT_PROFILE_MASK);
-            if ((profileMask & GL32.GL_CONTEXT_COMPATIBILITY_PROFILE_BIT) == 0) {
+            // A context made without attributes, as here, is a legacy one, which NVIDIA reports with a mask of 0: only a core bit rules it out.
+            if ((profileMask & GL32.GL_CONTEXT_CORE_PROFILE_BIT) != 0) {
                 throw new IllegalStateException("Expected a GL compatibility context, got profile mask 0x"
                     + Integer.toHexString(profileMask) + " (" + glVersion + ")");
             }

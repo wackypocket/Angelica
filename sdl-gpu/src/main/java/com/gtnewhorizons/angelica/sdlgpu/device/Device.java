@@ -229,7 +229,7 @@ public final class Device {
             }
             LOG.warn("Failed to create a '{}' SDL GPU device: {}", driver, SDLError.SDL_GetError());
             if (macVulkan && MoltenVK.locate() == null) {
-                LOG.warn("Vulkan on macOS needs MoltenVK. Add {} to the mods folder or install MoltenVK.", MoltenVK.JAR_NAME);
+                LOG.warn("Vulkan on macOS needs MoltenVK, which is not in the Angelica jar or angelica-moltenvk.jar and not installed on this system.");
             }
         }
         return 0;
@@ -488,7 +488,7 @@ public final class Device {
     }
 
     public boolean supportsVSyncMode(VSyncMode mode) {
-        return device != 0 && claimed && SDL_WindowSupportsGPUPresentMode(device, Display.getWindow(), toSdl(mode));
+        return mode != VSyncMode.FIFO_LATEST_READY && device != 0 && claimed && SDL_WindowSupportsGPUPresentMode(device, Display.getWindow(), toSdl(mode));
     }
 
     public long getClaimedWindow() {

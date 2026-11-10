@@ -4,6 +4,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.io.File;
+import java.io.IOException;
 import java.nio.file.Path;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -19,11 +20,15 @@ class BackendStartGuardTest {
     }
 
     private boolean boot(int revision) {
-        return BackendStartGuard.begin(dir.toFile(), true, false, revision, "");
+        return boot(revision, "");
+    }
+
+    private boolean boot(int revision, String driver) {
+        return BackendStartGuard.begin(dir.toFile(), true, false, revision, driver);
     }
 
     private File marker() {
-        return dir.resolve("sdlgpu-starting").toFile();
+        return dir.resolve("backend-starting").toFile();
     }
 
     @Test
@@ -60,5 +65,43 @@ class BackendStartGuardTest {
         assertFalse(boot(2));
         BackendStartGuard.arm();
         assertTrue(marker().isFile());
+    }
+
+    @Test
+    void strikesFromAnotherBackendDoNotCount() {
+        for (int i = 0; i < BackendStartGuard.STRIKE_LIMIT - 1; i++) {
+            assertFalse(boot(1, "vulkan"));
+            BackendStartGuard.arm();
+        }
+        assertFalse(boot(1, "native-vulkan"));
+        BackendStartGuard.arm();
+        assertFalse(boot(1, "native-vulkan"));
+        assertFalse(BackendStartGuard.tripped());
+    }
+
+    @Test
+    void guardFilesFromTheOldNamesAreRemoved() throws IOException {
+        final File starting = dir.resolve("sdlgpu-starting").toFile(), verified = dir.resolve("sdlgpu-verified").toFile();
+        assertTrue(starting.createNewFile());
+        assertTrue(verified.createNewFile());
+        boot();
+        assertFalse(starting.exists());
+        assertFalse(verified.exists());
+    }
+
+    @Test
+    void verifiedBackendsStayVerifiedWhenAlternating() {
+        for (String driver : new String[] {"vulkan", "native-vulkan"}) {
+            assertFalse(boot(1, driver));
+            BackendStartGuard.arm();
+            BackendStartGuard.disarm();
+            BackendStartGuard.latch();
+        }
+        assertFalse(boot(1, "vulkan"));
+        BackendStartGuard.arm();
+        assertFalse(marker().exists());
+        assertFalse(boot(1, "native-vulkan"));
+        BackendStartGuard.arm();
+        assertFalse(marker().exists());
     }
 }

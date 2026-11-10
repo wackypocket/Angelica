@@ -86,6 +86,32 @@ class AngelicaChunkRenderer extends DefaultChunkRenderer {
         if (provider != null) {
             provider.setRenderPassConfiguration(renderPassConfiguration);
         }
+        prewarmPrograms(provider);
+    }
+
+    /**
+     * Builds every terrain program the default pipeline can ask for, each pass in each fog mode, while the world loads, so
+     * the first frame to draw a pass or fog mode does not hitch on its compile and link.
+     */
+    @SuppressWarnings("unchecked")
+    private void prewarmPrograms(IrisShaderProvider provider) {
+        if (provider != null && provider.isShadersEnabled()) return;
+        if (!(this.environment.fogService().getFogMode() instanceof ChunkFogMode)) return;
+        final long start = System.nanoTime();
+        int built = 0;
+        for (TerrainRenderPass pass : (Iterable<TerrainRenderPass>) this.renderPassConfiguration.getAllKnownRenderPasses().distinct()::iterator) {
+            GlProgram<ChunkShaderInterface>[] programs = this.programsByPass.get(pass);
+            if (programs == null) {
+                programs = (GlProgram<ChunkShaderInterface>[]) new GlProgram[ChunkFogMode.values().length];
+                this.programsByPass.put(pass, programs);
+            }
+            for (ChunkFogMode mode : ChunkFogMode.values()) {
+                if (programs[mode.ordinal()] != null) continue;
+                programs[mode.ordinal()] = compileProgram(new ChunkShaderOptions(List.of(mode), pass));
+                built++;
+            }
+        }
+        AngelicaMod.LOGGER.info("Built {} terrain programs ahead of use in {} ms", built, (System.nanoTime() - start) / 1_000_000L);
     }
 
     private static void installBatchFactory() {

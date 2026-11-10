@@ -51,7 +51,8 @@ public final class FragmentShaderGenerator {
 
     private static void emitInputs(StringBuilder sb, FragmentKey key) {
         sb.append("// Inputs from vertex shader\n");
-        sb.append("in vec4 v_Color;\n");
+        final String colorQualifier = key.flatShade() ? "flat " : "";
+        sb.append(colorQualifier).append("in vec4 v_Color;\n");
         if (key.clipDiscard()) {
             sb.append(ClipDistanceGlsl.FS_IN_DIST0).append('\n').append(ClipDistanceGlsl.FS_IN_DIST1).append('\n');
         }
@@ -59,7 +60,7 @@ public final class FragmentShaderGenerator {
             sb.append("in vec4 v_Overlay;\n");
         }
         if (key.separateSpecular()) {
-            sb.append("in vec3 v_SpecularColor;\n");
+            sb.append(colorQualifier).append("in vec3 v_SpecularColor;\n");
         }
         // Per-unit texcoord inputs. Each enabled unit sources from its own varying
         for (int i = 0; i < key.nrEnabledUnits(); i++) {

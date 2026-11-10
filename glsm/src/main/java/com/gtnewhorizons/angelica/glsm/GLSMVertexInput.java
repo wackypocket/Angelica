@@ -33,15 +33,52 @@ public final class GLSMVertexInput {
         return VAOManager.CONV_TEX0 + glCtx.clientActiveTextureUnit;
     }
 
-    static void prepareClientArrays(GLContextState glCtx) {
-        final VAOManager vaos = glCtx.vaos;
-        if (vaos.hasAnyClientSideEnabledAttrib()) {
-            vaos.uploadClientArraysToVBO();
+    /** How far the next draw reads client arrays, so they are uploaded only that far: a bare pointer has no length of its own. */
+    public static void clientArraysReach(int vertexEnd) {
+        ctx().clientVertexEnd = vertexEnd;
+    }
+
+    /** The same for an indexed draw: the highest index, plus the base vertex, decides. */
+    public static void clientArraysReachIndices(GLContextState glCtx, int count, int type, long address, int baseVertex) {
+        if (!glCtx.vaos.hasAnyClientSideEnabledAttrib()) {
+            glCtx.clientVertexEnd = -1;
+            return;
+        }
+        final long minMax = QuadConverter.scanMinMaxIndex(address, type, count);
+        glCtx.clientVertexEnd = minMax == -1L ? 0 : (int) (minMax >>> 32) + 1 + baseVertex;
+    }
+
+    /** The same for indices in the bound element buffer, read back to find the highest. */
+    public static void clientArraysReachBufferIndices(GLContextState glCtx, int count, int type, long offset, int baseVertex) {
+        if (!glCtx.vaos.hasAnyClientSideEnabledAttrib() || count <= 0) {
+            glCtx.clientVertexEnd = -1;
+            return;
+        }
+        final java.nio.ByteBuffer src = com.gtnewhorizon.gtnhlib.bytebuf.MemoryUtilities.memAlloc(count * GLTypes.sizeBytes(type));
+        try {
+            RENDER_BACKEND.getBufferSubData(org.lwjgl.opengl.GL15.GL_ELEMENT_ARRAY_BUFFER, offset, src);
+            clientArraysReachIndices(glCtx, count, type, com.gtnewhorizon.gtnhlib.bytebuf.MemoryUtilities.memAddress0(src), baseVertex);
+        } finally {
+            com.gtnewhorizon.gtnhlib.bytebuf.MemoryUtilities.memFree(src);
         }
     }
 
+    static void prepareClientArrays(GLContextState glCtx) {
+        final VAOManager vaos = glCtx.vaos;
+        if (vaos.hasAnyClientSideEnabledAttrib()) {
+            vaos.uploadClientArraysToVBO(glCtx.clientVertexEnd);
+        }
+        glCtx.clientVertexEnd = -1;
+    }
+
     private static boolean isLegalClientArray(int conv, int size, int type, int stride) {
-        return isLegalPointer(VAOManager.isLegalConventional(conv, size, type), "client-array", "client array", conv, size, type, stride);
+        if (stride < 0) {
+            GLStateManager.recordError(GL11.GL_INVALID_VALUE);
+            return false;
+        }
+        if (isLegalPointer(VAOManager.isLegalConventional(conv, size, type), "client-array", "client array", conv, size, type, stride)) return true;
+        GLStateManager.recordError(VAOManager.conventionalError(conv, size, type));
+        return false;
     }
 
     private static boolean isLegalVertexAttrib(int index, int size, int type, int stride, boolean integer) {
@@ -265,19 +302,19 @@ public final class GLSMVertexInput {
     }
 
     public static void glNormalPointer(int type, int stride, FloatBuffer pointer) {
-        ffpClientArrayPointer(VAOManager.CONV_NORMAL, 3, GL11.GL_FLOAT, Usage.NORMAL.isNormalized(), stride, MemoryUtilities.memByteBuffer(pointer));
+        ffpClientArrayPointer(VAOManager.CONV_NORMAL, 3, type, Usage.NORMAL.isNormalized(), stride, MemoryUtilities.memByteBuffer(pointer));
     }
 
     public static void glNormalPointer(int type, int stride, ShortBuffer pointer) {
-        ffpClientArrayPointer(VAOManager.CONV_NORMAL, 3, GL11.GL_SHORT, Usage.NORMAL.isNormalized(), stride, MemoryUtilities.memByteBuffer(pointer));
+        ffpClientArrayPointer(VAOManager.CONV_NORMAL, 3, type, Usage.NORMAL.isNormalized(), stride, MemoryUtilities.memByteBuffer(pointer));
     }
 
     public static void glNormalPointer(int type, int stride, IntBuffer pointer) {
-        ffpClientArrayPointer(VAOManager.CONV_NORMAL, 3, GL11.GL_INT, Usage.NORMAL.isNormalized(), stride, MemoryUtilities.memByteBuffer(pointer));
+        ffpClientArrayPointer(VAOManager.CONV_NORMAL, 3, type, Usage.NORMAL.isNormalized(), stride, MemoryUtilities.memByteBuffer(pointer));
     }
 
     public static void glNormalPointer(int type, int stride, DoubleBuffer pointer) {
-        ffpClientArrayPointer(VAOManager.CONV_NORMAL, 3, GL11.GL_DOUBLE, Usage.NORMAL.isNormalized(), stride, MemoryUtilities.memByteBuffer(pointer));
+        ffpClientArrayPointer(VAOManager.CONV_NORMAL, 3, type, Usage.NORMAL.isNormalized(), stride, MemoryUtilities.memByteBuffer(pointer));
     }
 
     public static void glNormalPointer(int type, int stride, long pointer_buffer_offset) {
@@ -326,12 +363,12 @@ public final class GLSMVertexInput {
 
     public static void glEnableClientState(int cap) {
         rejectExitCapture();
-        setClientArrayCap(ctx(), cap, true);
+        if (!setClientArrayCap(ctx(), cap, true)) GLStateManager.recordError(GL11.GL_INVALID_ENUM);
     }
 
     public static void glDisableClientState(int cap) {
         rejectExitCapture();
-        setClientArrayCap(ctx(), cap, false);
+        if (!setClientArrayCap(ctx(), cap, false)) GLStateManager.recordError(GL11.GL_INVALID_ENUM);
     }
 
     static boolean setClientArrayCap(GLContextState glCtx, int cap, boolean enabled) {
@@ -367,6 +404,7 @@ public final class GLSMVertexInput {
     }
 
     public static void glVertexAttribPointer(int index, int size, int type, boolean normalized, int stride, long offset) {
+        if (!RENDER_BACKEND.checks().vertexAttribPointer(index, size, type, normalized, stride)) return;
         rejectExitCapture();
         if (!isLegalVertexAttrib(index, size, type, stride, false)) return;
         final GLContextState glCtx = ctx();
@@ -380,28 +418,34 @@ public final class GLSMVertexInput {
     }
 
     public static void glVertexAttribPointer(int index, int size, int type, boolean normalized, int stride, FloatBuffer pointer) {
+        if (!RENDER_BACKEND.checks().vertexAttribPointer(index, size, type, normalized, stride)) return;
         glVertexAttribPointer(index, size, type, normalized, stride, MemoryUtilities.memByteBuffer(pointer));
     }
 
     public static void glVertexAttribPointer(int index, int size, int type, boolean normalized, int stride, DoubleBuffer pointer) {
+        if (!RENDER_BACKEND.checks().vertexAttribPointer(index, size, type, normalized, stride)) return;
         glVertexAttribPointer(index, size, type, normalized, stride, MemoryUtilities.memByteBuffer(pointer));
     }
 
     public static void glVertexAttribPointer(int index, int size, int type, boolean normalized, int stride, IntBuffer pointer) {
+        if (!RENDER_BACKEND.checks().vertexAttribPointer(index, size, type, normalized, stride)) return;
         glVertexAttribPointer(index, size, type, normalized, stride, MemoryUtilities.memByteBuffer(pointer));
     }
 
     public static void glVertexAttribPointer(int index, int size, int type, boolean normalized, int stride, ShortBuffer pointer) {
+        if (!RENDER_BACKEND.checks().vertexAttribPointer(index, size, type, normalized, stride)) return;
         glVertexAttribPointer(index, size, type, normalized, stride, MemoryUtilities.memByteBuffer(pointer));
     }
 
     public static void glVertexAttribPointer(int index, int size, int type, boolean normalized, int stride, ByteBuffer pointer) {
+        if (!RENDER_BACKEND.checks().vertexAttribPointer(index, size, type, normalized, stride)) return;
         rejectExitCapture();
         if (!isLegalVertexAttrib(index, size, type, stride, false)) return;
         ctx().vaos.setAttribute(index, size, type, normalized, stride, pointer);
     }
 
     public static void glVertexAttribIPointer(int index, int size, int type, int stride, long offset) {
+        if (!RENDER_BACKEND.checks().vertexAttribIPointer(index, size, type, stride)) return;
         rejectExitCapture();
         if (!isLegalVertexAttrib(index, size, type, stride, true)) return;
         final GLContextState glCtx = ctx();
@@ -411,16 +455,19 @@ public final class GLSMVertexInput {
     }
 
     public static void glVertexAttribIPointer(int index, int size, int type, int stride, ByteBuffer pointer) {
+        if (!RENDER_BACKEND.checks().vertexAttribIPointer(index, size, type, stride)) return;
         rejectExitCapture();
         if (!isLegalVertexAttrib(index, size, type, stride, true)) return;
         ctx().vaos.setIntegerAttribute(index, size, type, stride, pointer);
     }
 
     public static void glVertexAttribIPointer(int index, int size, int type, int stride, IntBuffer pointer) {
+        if (!RENDER_BACKEND.checks().vertexAttribIPointer(index, size, type, stride)) return;
         glVertexAttribIPointer(index, size, type, stride, MemoryUtilities.memByteBuffer(pointer));
     }
 
     public static void glVertexAttribIPointer(int index, int size, int type, int stride, ShortBuffer pointer) {
+        if (!RENDER_BACKEND.checks().vertexAttribIPointer(index, size, type, stride)) return;
         glVertexAttribIPointer(index, size, type, stride, MemoryUtilities.memByteBuffer(pointer));
     }
 
@@ -436,6 +483,7 @@ public final class GLSMVertexInput {
     public static void glVertexAttribBinding(int attribindex, int bindingindex) { rejectExitCapture(); RENDER_BACKEND.vertexAttribBinding(attribindex, bindingindex); }
 
     public static void glEnableVertexAttribArray(int index) {
+        if (!RENDER_BACKEND.checks().enableVertexAttribArray(index)) return;
         rejectExitCapture();
         if (!isValidVertexAttribIndex(index, "glEnableVertexAttribArray")) return;
         final GLContextState glCtx = ctx();
@@ -444,6 +492,7 @@ public final class GLSMVertexInput {
     }
 
     public static void glDisableVertexAttribArray(int index) {
+        if (!RENDER_BACKEND.checks().disableVertexAttribArray(index)) return;
         rejectExitCapture();
         if (!isValidVertexAttribIndex(index, "glDisableVertexAttribArray")) return;
         final GLContextState glCtx = ctx();
@@ -544,7 +593,8 @@ public final class GLSMVertexInput {
                 tflag = true; cflag = true; nflag = true; tcomps = 4; ccomps = 4; vcomps = 4;
                 ctype = GL11.GL_FLOAT; coffset = 4 * f; noffset = 8 * f; voffset = 11 * f; defstride = 15 * f; break;
             default:
-                return; // Invalid format
+                GLStateManager.recordError(GL11.GL_INVALID_ENUM);
+                return;
         }
 
         if (stride == 0) stride = defstride;
@@ -595,6 +645,7 @@ public final class GLSMVertexInput {
     }
 
     public static void glBindVertexArray(int array) {
+        if (!RENDER_BACKEND.checks().bindVertexArray(array)) return;
         rejectExitCapture();
         final GLContextState glCtx = ctx();
         if (DisplayListManager.isRecording()) {
@@ -634,9 +685,17 @@ public final class GLSMVertexInput {
         }
     }
 
+    public static void glDeleteVertexArrays(IntBuffer arrays) {
+        for (int i = arrays.position(); i < arrays.limit(); i++) glDeleteVertexArrays(arrays.get(i));
+    }
+
     public static int glGenVertexArrays() {
         requireContext("glGenVertexArrays");
         return RENDER_BACKEND.genVertexArrays();
+    }
+
+    public static void glGenVertexArrays(IntBuffer arrays) {
+        for (int i = arrays.position(); i < arrays.limit(); i++) arrays.put(i, glGenVertexArrays());
     }
 
     public static boolean glIsVertexArray(int array) {

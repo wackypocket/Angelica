@@ -17,6 +17,10 @@ import static org.junit.jupiter.api.Assertions.fail;
 public final class GlsmRedirectAgent {
 
     private static final String GTNHLIB = "com/gtnewhorizon/gtnhlib/";
+    /** Written against GL as a mod is, so it must reach the backends the way a mod does. */
+    private static final String CONFORMANCE = "com/gtnewhorizons/angelica/glemu/nativetest/glsm/GlConformanceScenarios";
+    /** Builds what the conformance probes call against, so that GLSM sees it as it would see a mod's objects. */
+    private static final String FIXTURE = "com/gtnewhorizons/angelica/glemu/nativetest/glsm/GlProbeFixture";
     private static final List<Throwable> FAILURES = new CopyOnWriteArrayList<>();
     private static final AtomicInteger TRANSFORMED = new AtomicInteger();
     private static boolean installed;
@@ -31,7 +35,7 @@ public final class GlsmRedirectAgent {
         MutableStatics.install(instrumentation);
         final ModRedirector redirector = new ModRedirector(ClassDump.DISABLED);
         addTransformer(instrumentation, (className, classfile) -> {
-            if (!className.startsWith(GTNHLIB)) return null;
+            if (!className.startsWith(GTNHLIB) && !className.startsWith(CONFORMANCE) && !className.equals(FIXTURE)) return null;
             final byte[] out = redirector.transform(className.replace('/', '.'), classfile, null);
             if (out == classfile) return null;
             TRANSFORMED.incrementAndGet();

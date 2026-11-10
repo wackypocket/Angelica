@@ -59,7 +59,10 @@ public abstract class RenderBackend {
     public boolean isIndirectRequired() { return false; }
     public boolean supportsGeometryShaders() { return true; }
     public boolean isSDLGPU() { return false; }
-
+    public boolean supportsInPlaceMappedWrites() { return false; }
+    public boolean isNative() { return false; }
+    /** Whether GL calls are emulated on another API rather than reaching an OpenGL driver. */
+    public final boolean emulatesGL() { return isSDLGPU() || isNative(); }
     public boolean framebufferCompletenessIsMeaningful() { return true; }
     public void onPersistentBufferWrite(int glId, long offset, long size) {}
     public boolean isBufferImmutable(int glId) { return false; }
@@ -113,7 +116,7 @@ public abstract class RenderBackend {
 
     public final boolean vsyncHonored() { return vsyncHonored; }
 
-    public boolean supportsVSyncMode(VSyncMode mode) { return mode != VSyncMode.MAILBOX; }
+    public boolean supportsVSyncMode(VSyncMode mode) { return mode == VSyncMode.OFF || mode == VSyncMode.ON; }
 
     protected final void publishVSyncMode(VSyncMode mode) {
         effectiveVSyncMode = mode;
@@ -234,13 +237,51 @@ public abstract class RenderBackend {
 
     public void awaitPresent() {}
 
+    public void awaitFrameSlot() {}
+
+    /** The context went back to fixed function, for a backend with something else waiting to draw. */
+    public void programReleased() {}
+
+    /** Legacy state a backend can take on itself; false leaves GLSM to report it as unavailable. */
+    public boolean rasterPos(float x, float y, float z, float w) { return false; }
+    public boolean pixelTransfer(int pname, float value) { return false; }
+    public boolean accum(int op, float value) { return false; }
+    public boolean polygonStipple(ByteBuffer pattern) { return false; }
+
+    public static final int DEFAULT_PROBE_LEAD_PERIODS = 2;
+
+    /** How many refresh periods ahead the frame pacer runs while looking for the driver to block. */
+    public int probeLeadPeriods() {
+        return DEFAULT_PROBE_LEAD_PERIODS;
+    }
+
     public void parkNanos(long nanos) {
         LockSupport.parkNanos(nanos);
     }
 
+    /**
+     * The game loop asks for events up to three times between frames (present, the frame pacer, before rendering).
+     * With lwjgl3ify on macOS each pump is a blocking round trip to the main thread, so a pump that follows another
+     * within this window is skipped: the events have just been read.
+     */
+    static final long PUMP_COALESCE_NANOS = 500_000L;
+    private volatile long lastPumpNanos = Long.MIN_VALUE / 2;
+
     public void pumpDisplayMessages() {
+        if (System.nanoTime() - this.lastPumpNanos < PUMP_COALESCE_NANOS) return;
         Display.processMessages();
+        this.lastPumpNanos = System.nanoTime();
     }
+
+    public boolean canPumpDisplayMessagesOffThread() { return true; }
+
+    public boolean tracksWindowFullscreen() { return false; }
+
+    public boolean isWindowFullscreen() { return false; }
+
+    public void saveWindowedBounds() {}
+
+    public void restoreWindowedBounds() {}
 
     private boolean presentSuppressed;
 
@@ -523,6 +564,14 @@ public abstract class RenderBackend {
     public boolean isProgram(int obj) { return false; }
     public boolean supportsProgramBinary() { return false; }
     public void programParameteri(int program, int pname, int value) {}
+
+    /** GL_PROGRAM_SEPARABLE as the next link will take it. A query answers for the last link. */
+    public boolean programIsSeparableAtNextLink(int program) {
+        // GL_PROGRAM_SEPARABLE is an unknown pname, and so an error, without separate shader objects.
+        final var caps = com.gtnewhorizons.angelica.glsm.GLStateManager.capabilities;
+        if (caps == null || !caps.OpenGL41 && !caps.GL_ARB_separate_shader_objects) return false;
+        return getProgrami(program, 0x8258) != 0;
+    }
     public void getProgramBinary(int program, IntBuffer length, IntBuffer binaryFormat, ByteBuffer binary) {}
     public void programBinary(int program, int binaryFormat, ByteBuffer binary) {}
     public void validateProgram(int program) {}
@@ -623,6 +672,7 @@ public abstract class RenderBackend {
     public abstract void enableVertexAttribArray(int index);
     public abstract void disableVertexAttribArray(int index);
     public abstract void vertexAttribDivisor(int index, int divisor);
+    public void vertexBindingDivisor(int binding, int divisor) { vertexAttribDivisor(binding, divisor); }
     public abstract void bindVertexBuffer(int bindingindex, int buffer, long offset, int stride);
     public abstract void vertexAttribFormat(int attribindex, int size, int type, boolean normalized, int relativeoffset);
     public abstract void vertexAttribIFormat(int attribindex, int size, int type, int relativeoffset);
@@ -705,6 +755,9 @@ public abstract class RenderBackend {
 
     // Debug output
     public boolean supportsDebugOutput() { return false; }
+    public boolean isEnabledi(int cap, int index) { return false; }
+
+    public GlCallChecks checks() { return GlCallChecks.NONE; }
     public int setupDebugOutput(DebugMessageHandler handler) { return 0; }
     public int disableDebugOutput() { return 0; }
 

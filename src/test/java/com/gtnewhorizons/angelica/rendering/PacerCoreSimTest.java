@@ -17,6 +17,7 @@ import static com.gtnewhorizons.angelica.rendering.PacerTestClock.P60;
 import static com.gtnewhorizons.angelica.rendering.PacerTestClock.cadenceNanos;
 import static com.gtnewhorizons.angelica.rendering.PacerTestClock.driverPaced;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class PacerCoreSimTest {
@@ -198,6 +199,7 @@ class PacerCoreSimTest {
         Mode mode = Mode.FIFO;
         Gate gate = Gate.SWAP;
         int queue = 1;
+        int probeLeadPeriods = PacerCore.DEFAULT_PROBE_LEAD_PERIODS;
         int gateOutageFrom = Integer.MAX_VALUE;
         int gateOutageTo = Integer.MAX_VALUE;
         long gpuTail = 500 * US;
@@ -264,6 +266,7 @@ class PacerCoreSimTest {
         final FakeSleeper parker = new FakeSleeper(clock, sim.granularity);
         final PacerSleeper sleeper = new PacerSleeper(clock.clock(), parker, false);
         final PacerCore core = new PacerCore(clock.clock(), sleeper);
+        core.setProbeLeadPeriods(sim.probeLeadPeriods);
         core.setRefreshPeriodNanos(sim.refreshPeriod);
         core.setFifo(sim.fifo);
         core.setVsyncOn(sim.vsyncOn);
@@ -397,6 +400,18 @@ class PacerCoreSimTest {
             final long floor = c - c / PacerCore.CATCHUP_DIVISOR - slopNanos - unpinned;
             assertTrue(interval >= floor, r + " interval " + interval + "ns at frame " + f + ", floor is " + floor);
             assertTrue(r.maxStartSleep <= 2 * c, r + " start sleep " + r.maxStartSleep + "ns exceeds two periods");
+        }
+    }
+
+    @Test
+    void theNativeLeadFindsADeeperPresentQueueThatTheDefaultMisses() {
+        for (final int queue : new int[] { 3, 4 }) {
+            final Sim deep = fifo60(4 * MS, queue, Gate.SWAP).named("Q=" + queue + " native lead");
+            deep.probeLeadPeriods = 6;
+            final Result found = run(deep);
+            assertTrue(found.driverPaced, found + " must hand pacing to the driver");
+            final Result missed = run(fifo60(4 * MS, queue, Gate.SWAP).named("Q=" + queue + " default lead"));
+            assertFalse(missed.driverPaced, missed + " gives up before the queue fills");
         }
     }
 

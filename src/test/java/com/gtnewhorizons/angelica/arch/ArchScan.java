@@ -38,7 +38,10 @@ final class ArchScan {
         MIXIN("build/classes/java/mixin"),
         GLSM("glsm/build/classes/java/main"),
         LWJGL3_BACKEND("lwjgl3-backend/build/classes/java/main"),
-        SDL_GPU("sdl-gpu/build/classes/java/main");
+        SDL_GPU("sdl-gpu/build/classes/java/main"),
+        GLEMU("glemu/build/classes/java/main"),
+        VULKAN("vulkan/build/classes/java/main"),
+        METAL("metal/build/classes/java/main");
 
         final String path;
 

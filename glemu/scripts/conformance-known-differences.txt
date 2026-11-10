@@ -1,0 +1,568 @@
+# Scenario, key and reason, tab separated. A key of * covers the whole scenario.
+textures: formats keep their internal format	0x81a6	Apple reports GL_DEPTH_COMPONENT24 as 32; the requested format is the expected answer
+enum: glTexImage2D internal format	error	The specification says GL_INVALID_VALUE; Apple answers GL_INVALID_ENUM
+value: sampler uniform over units	error	The specification says GL_INVALID_VALUE; Apple accepts it
+operation: vertex pointer with no buffer	error	Legal in a compatibility profile, where it is a client array; the driver here is core only
+queries accepted	accept:0x84e6	NVIDIA accepts this name, which glGet has no state for; Mesa refuses it as we do
+queries accepted	accept:0x8864	NVIDIA accepts this name, which glGet has no state for; Mesa refuses it as we do
+queries accepted	accept:0x8865	NVIDIA accepts this name, which glGet has no state for; Mesa refuses it as we do
+queries accepted	accept:0x889e	NVIDIA accepts this name, which glGet has no state for; Mesa refuses it as we do
+queries accepted	accept:0x8b30	NVIDIA accepts this name, which glGet has no state for; Mesa refuses it as we do
+queries accepted	accept:0x8b31	NVIDIA accepts this name, which glGet has no state for; Mesa refuses it as we do
+queries accepted	accept:0x8c7f	NVIDIA accepts this name, which glGet has no state for; Mesa refuses it as we do
+queries accepted	accept:0x8dd9	NVIDIA accepts this name, which glGet has no state for; Mesa refuses it as we do
+queries accepted	accept:0x8e87	NVIDIA accepts this name, which glGet has no state for; Mesa refuses it as we do
+queries accepted	accept:0x8e88	NVIDIA accepts this name, which glGet has no state for; Mesa refuses it as we do
+draw: point size from the shader and point coordinates	px:upper left origin	These drivers run a compatibility context, where gl_PointCoord needs GL_POINT_SPRITE enabled; ours is core, where sprites are always on
+draw: point size from the shader and point coordinates	px:lower left origin	These drivers run a compatibility context, where gl_PointCoord needs GL_POINT_SPRITE enabled; ours is core, where sprites are always on
+blit: [2, 3, 10, 9, 4, 5, 15, 14] 0x2601	px:image	A scaled blit with linear filtering samples as the implementation chooses; Mesa samples as we do
+blit: [4, 4, 12, 12, 0, 0, 16, 16] 0x2601	px:image	A scaled blit with linear filtering samples as the implementation chooses; Mesa samples as we do
+read: 0x1908 0x8368	px:bytes	Both drivers widen 8-bit values to more bits by repeating their top bits; we convert through floats as GL describes, one stored unit away
+pixels: 0x8059 from 0x1908 0x1401	px:0x1406	Both drivers widen 8-bit values to more bits by repeating their top bits; we convert through floats as GL describes, one stored unit away
+pixels: 0x8059 from 0x1908 0x1401	px:0x8c3e	Both drivers widen 8-bit values to more bits by repeating their top bits; we convert through floats as GL describes, one stored unit away
+pixels: 0x8059 from 0x80e1 0x1401	px:0x1406	NVIDIA keeps more precision than the format holds, or rounds otherwise; Mesa converts as we do
+pixels: 0x8059 from 0x80e1 0x1401	px:0x8c3e	NVIDIA keeps more precision than the format holds, or rounds otherwise; Mesa converts as we do
+pixels: 0x8059 from 0x1907 0x1401	px:0x1406	NVIDIA keeps more precision than the format holds, or rounds otherwise; Mesa converts as we do
+pixels: 0x8059 from 0x1907 0x1401	px:0x8c3e	NVIDIA keeps more precision than the format holds, or rounds otherwise; Mesa converts as we do
+pixels: 0x8059 from 0x1903 0x1401	px:0x1406	NVIDIA keeps more precision than the format holds, or rounds otherwise; Mesa converts as we do
+pixels: 0x8059 from 0x1908 0x8033	px:0x1406	NVIDIA keeps more precision than the format holds, or rounds otherwise; Mesa converts as we do
+pixels: 0x8059 from 0x1908 0x8033	px:0x8c3e	NVIDIA keeps more precision than the format holds, or rounds otherwise; Mesa converts as we do
+pixels: 0x8059 from 0x80e1 0x8367	px:0x1401	NVIDIA keeps more precision than the format holds, or rounds otherwise; Mesa converts as we do
+pixels: 0x8059 from 0x80e1 0x8367	px:0x1406	NVIDIA keeps more precision than the format holds, or rounds otherwise; Mesa converts as we do
+pixels: 0x8059 from 0x80e1 0x8367	px:0x8033	NVIDIA keeps more precision than the format holds, or rounds otherwise; Mesa converts as we do
+pixels: 0x8f97 from 0x1908 0x1401	px:0x1406	NVIDIA keeps more precision than the format holds, or rounds otherwise; Mesa converts as we do
+pixels: 0x8f97 from 0x1908 0x1401	px:0x8c3e	NVIDIA keeps more precision than the format holds, or rounds otherwise; Mesa converts as we do
+pixels: 0x8f97 from 0x80e1 0x1401	px:0x1406	NVIDIA keeps more precision than the format holds, or rounds otherwise; Mesa converts as we do
+pixels: 0x8f97 from 0x80e1 0x1401	px:0x8c3e	NVIDIA keeps more precision than the format holds, or rounds otherwise; Mesa converts as we do
+pixels: 0x8f97 from 0x1907 0x1401	px:0x1406	NVIDIA keeps more precision than the format holds, or rounds otherwise; Mesa converts as we do
+pixels: 0x8f97 from 0x1907 0x1401	px:0x8c3e	NVIDIA keeps more precision than the format holds, or rounds otherwise; Mesa converts as we do
+pixels: 0x8f97 from 0x1903 0x1401	px:0x1406	NVIDIA keeps more precision than the format holds, or rounds otherwise; Mesa converts as we do
+pixels: 0x8f97 from 0x1903 0x1401	px:0x8c3b	NVIDIA keeps more precision than the format holds, or rounds otherwise; Mesa converts as we do
+pixels: 0x8f97 from 0x1903 0x1401	px:0x8c3e	NVIDIA keeps more precision than the format holds, or rounds otherwise; Mesa converts as we do
+pixels: 0x8f97 from 0x1908 0x1403	px:0x1406	NVIDIA keeps more precision than the format holds, or rounds otherwise; Mesa converts as we do
+pixels: 0x8f97 from 0x1908 0x1403	px:0x8c3e	NVIDIA keeps more precision than the format holds, or rounds otherwise; Mesa converts as we do
+pixels: 0x8f97 from 0x1908 0x1406	px:0x1406	NVIDIA keeps more precision than the format holds, or rounds otherwise; Mesa converts as we do
+pixels: 0x8f97 from 0x1908 0x1406	px:0x8c3e	NVIDIA keeps more precision than the format holds, or rounds otherwise; Mesa converts as we do
+pixels: 0x8f97 from 0x1907 0x8363	px:0x1406	NVIDIA keeps more precision than the format holds, or rounds otherwise; Mesa converts as we do
+pixels: 0x8f97 from 0x1907 0x8363	px:0x8c3e	NVIDIA keeps more precision than the format holds, or rounds otherwise; Mesa converts as we do
+pixels: 0x8f97 from 0x1908 0x8033	px:0x1406	NVIDIA keeps more precision than the format holds, or rounds otherwise; Mesa converts as we do
+pixels: 0x8f97 from 0x1908 0x8033	px:0x8c3e	NVIDIA keeps more precision than the format holds, or rounds otherwise; Mesa converts as we do
+pixels: 0x8f97 from 0x1908 0x8368	px:0x1406	NVIDIA keeps more precision than the format holds, or rounds otherwise; Mesa converts as we do
+pixels: 0x8f97 from 0x1908 0x8368	px:0x8c3e	NVIDIA keeps more precision than the format holds, or rounds otherwise; Mesa converts as we do
+pixels: 0x8f97 from 0x80e1 0x8367	px:0x1406	NVIDIA keeps more precision than the format holds, or rounds otherwise; Mesa converts as we do
+pixels: 0x8f97 from 0x80e1 0x8367	px:0x8c3e	NVIDIA keeps more precision than the format holds, or rounds otherwise; Mesa converts as we do
+fixed: fog 0x2601	px:image	NVIDIA works fog out per fragment; Mesa, as we do, per vertex, and GL allows either
+fixed: fog 0x800	px:image	NVIDIA works fog out per fragment; Mesa, as we do, per vertex, and GL allows either
+fixed: fog 0x801	px:image	NVIDIA works fog out per fragment; Mesa, as we do, per vertex, and GL allows either
+value: glTexSubImage2D level	error	GL 4.6 says GL_INVALID_OPERATION for a level with no image, as Mesa answers; NVIDIA answers GL_INVALID_VALUE
+operation: glTexSubImage2D with no image	error	GL 4.6 says GL_INVALID_OPERATION for a level with no image, as Mesa answers; NVIDIA answers GL_INVALID_VALUE
+operation: glCopyTexSubImage2D with no image	error	GL 4.6 says GL_INVALID_OPERATION for a level with no image, as Mesa answers; NVIDIA answers GL_INVALID_VALUE
+textures: defaults and parameters	no image format	A compatibility context starts a level with no image at format 1; a core one, which we report and Mesa matches here, at GL_RGBA
+programs: compile and link results	empty link	NVIDIA fails to link a program with nothing attached; GL links it, as Mesa and we do
+legacy: nested glBegin	error	Both drivers answer glGetError between glBegin and glEnd with 0, as the call is itself not allowed there; we report the nested glBegin, which tells a mod more
+fixed: client pointer on a vertex array object	error	Both drivers refuse client memory with a vertex array object bound, as GL says; GLSM binds arrays of its own while drawing, so it cannot tell one a mod bound and accepts the pointer
+doubles: signed zeros in min and max	px:min(0,-0) min(-0,0) max(0,-0) max(-0,0)	Which zero these give differs by driver: NVIDIA +0 for all four, Mesa -0 for all four, the device here -0 for min and +0 for max
+probe	glCopyTexSubImage1D	Apple accepts a bad target when the size is 0; the specification refuses it
+probe	glCopyTexSubImage3D	Apple accepts a bad target when the size is 0; the specification refuses it
+probe	glCopyTexSubImage2D	Apple accepts a bad target when the size is 0; the specification refuses it
+probe	glDrawArraysInstanced	Apple accepts bad arguments when no instance is drawn; the specification refuses them
+probe	glSamplerParameterf	The reference page says GL_INVALID_VALUE for an unknown sampler; Apple answers GL_INVALID_OPERATION
+probe	glSamplerParameteri	The reference page says GL_INVALID_VALUE for an unknown sampler; Apple answers GL_INVALID_OPERATION
+probe	glBindTransformFeedback	The reference page says GL_INVALID_ENUM for a bad target; Apple answers GL_INVALID_VALUE
+probe	glBeginQuery	Several arguments are wrong at once, and GL does not say which error comes first
+probe	glBeginQueryIndexed	Several arguments are wrong at once, and GL does not say which error comes first
+probe	glEndQueryIndexed	Several arguments are wrong at once, and GL does not say which error comes first
+probe	glBlitFramebuffer	Several arguments are wrong at once, and GL does not say which error comes first
+probe	glBlendEquationi	Several arguments are wrong at once, and GL does not say which error comes first
+probe	glBlendEquationSeparatei	Several arguments are wrong at once, and GL does not say which error comes first
+probe	glTexImage2D	The specification says GL_INVALID_VALUE for a bad internal format; Apple answers GL_INVALID_ENUM
+probe	glDrawArrays	Core only: a compatibility profile draws with no program using fixed function
+probe	glLineWidth	Core only: a forward compatible context refuses wide lines, which a compatibility profile allows
+fragment: flat shading 0x8e4e	px:loop	GL allows a line either end pixel (14.5.1); turning one round to bring its provoking vertex forward, on a device with only the other convention, covers the other
+multisample: depth and stencil resolve	depth:inside	The specification has a blit write a sample's depth; Apple leaves the destination as cleared
+multisample: depth and stencil resolve	stencil:inside	The specification has a blit write a sample's stencil; Apple leaves the destination as cleared
+multisample: coverage 0.25 inverted	px:covered	The specification inverts the coverage bits, leaving three samples of four; Apple keeps one
+multisample: coverage 1.0 inverted	px:covered	The specification inverts the coverage bits, leaving no samples; Apple keeps them all
+multisample: an integer image resolves to a sample of its own	*	The specification allows a multisampled integer image up to GL_MAX_INTEGER_SAMPLES; Apple refuses this one
+multisample: a resolve between formats is refused	error	The specification only refuses a resolve between formats when both framebuffers are multisampled, and the Khronos suite expects it to work; Apple refuses it
+pixels: 0x8051 from 0x1908 0x8368	px:0x1406	Apple keeps 10 bits for GL_RGB8 given 10 bit data, and a sized format is only a request; we store the 8 asked for
+pixels: 0x8051 from 0x1908 0x8368	px:0x8c3e	Apple keeps 10 bits for GL_RGB8 given 10 bit data, and a sized format is only a request; we store the 8 asked for
+pixels: 0x805b from 0x1907 0x8363	px:0x8c3b	Apple truncates converting to a small float or packed format; we round to nearest
+pixels: 0x881a from 0x1908 0x1401	px:0x1406	Apple truncates converting to a small float or packed format; we round to nearest
+pixels: 0x881a from 0x80e1 0x1401	px:0x1406	Apple truncates converting to a small float or packed format; we round to nearest
+pixels: 0x881a from 0x1908 0x1403	px:0x1406	Apple truncates converting to a small float or packed format; we round to nearest
+pixels: 0x881a from 0x1908 0x1406	px:0x1406	Apple truncates converting to a small float or packed format; we round to nearest
+pixels: 0x881a from 0x1907 0x8363	px:0x1406	Apple truncates converting to a small float or packed format; we round to nearest
+pixels: 0x881a from 0x1907 0x8363	px:0x8c3b	Apple truncates converting to a small float or packed format; we round to nearest
+pixels: 0x881a from 0x1908 0x8033	px:0x1406	Apple truncates converting to a small float or packed format; we round to nearest
+pixels: 0x881a from 0x1908 0x8368	px:0x1406	Apple truncates converting to a small float or packed format; we round to nearest
+pixels: 0x881a from 0x80e1 0x8367	px:0x1406	Apple truncates converting to a small float or packed format; we round to nearest
+pixels: 0x8814 from 0x1907 0x8363	px:0x8c3b	Apple truncates converting to a small float or packed format; we round to nearest
+pixels: 0x8c3a from 0x1907 0x8363	px:0x1406	Apple truncates converting to a small float or packed format; we round to nearest
+pixels: 0x8c3a from 0x1907 0x8363	px:0x8c3b	Apple truncates converting to a small float or packed format; we round to nearest
+pixels: 0x8c3a from 0x1907 0x8363	px:0x8c3e	Apple truncates converting to a small float or packed format; we round to nearest
+pixels: 0x8c3d from 0x1908 0x1401	px:0x8c3b	Apple truncates converting to a small float or packed format; we round to nearest
+pixels: 0x8c3d from 0x80e1 0x1401	px:0x8c3b	Apple truncates converting to a small float or packed format; we round to nearest
+pixels: 0x8c3d from 0x1907 0x1401	px:0x8c3b	Apple truncates converting to a small float or packed format; we round to nearest
+pixels: 0x8c3d from 0x1908 0x1403	px:0x8c3b	Apple truncates converting to a small float or packed format; we round to nearest
+pixels: 0x8c3d from 0x1908 0x1406	px:0x8c3b	Apple truncates converting to a small float or packed format; we round to nearest
+pixels: 0x8c3d from 0x1907 0x8363	px:0x8c3b	Apple truncates converting to a small float or packed format; we round to nearest
+pixels: 0x8c3d from 0x1908 0x8033	px:0x8c3b	Apple truncates converting to a small float or packed format; we round to nearest
+pixels: 0x8c3d from 0x1908 0x8368	px:0x8c3b	Apple truncates converting to a small float or packed format; we round to nearest
+pixels: 0x8059 from 0x1908 0x1403	px:0x1406	Apple drops low bits going from 16 to 10; we round to nearest
+pixels: 0x8059 from 0x1908 0x1403	px:0x8c3e	Apple drops low bits going from 16 to 10; we round to nearest
+pixels: 0x8059 from 0x1907 0x8363	px:0x8c3b	Apple truncates converting to a small float or packed format; we round to nearest
+pixels: 0x8059 from 0x80e1 0x8367	px:0x8c3b	Apple truncates converting to a small float or packed format; we round to nearest
+pixels: 0x8f97 from 0x1908 0x1401	px:0x8c3b	Apple truncates converting to a small float or packed format; we round to nearest
+pixels: 0x8f97 from 0x80e1 0x1401	px:0x8c3b	Apple truncates converting to a small float or packed format; we round to nearest
+pixels: 0x8f97 from 0x1907 0x1401	px:0x8c3b	Apple truncates converting to a small float or packed format; we round to nearest
+pixels: 0x8f97 from 0x1908 0x1403	px:0x8c3b	Apple truncates converting to a small float or packed format; we round to nearest
+pixels: 0x8f97 from 0x1908 0x1406	px:0x8c3b	Apple truncates converting to a small float or packed format; we round to nearest
+pixels: 0x8f97 from 0x1907 0x8363	px:0x8c3b	Apple truncates converting to a small float or packed format; we round to nearest
+pixels: 0x8f97 from 0x1908 0x8033	px:0x8c3b	Apple truncates converting to a small float or packed format; we round to nearest
+pixels: 0x8f97 from 0x1908 0x8368	px:0x8c3b	Apple truncates converting to a small float or packed format; we round to nearest
+pixels: 0x8f97 from 0x80e1 0x8367	px:0x8c3b	Apple truncates converting to a small float or packed format; we round to nearest
+guided	glActiveShaderProgram pipeline=0	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glBindFragDataLocationIndexed index=-1	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glBindFragDataLocationIndexed index=0xBEEF	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glBindFragDataLocationIndexed index=big	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glBindFramebuffer framebuffer=-1	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glBindFramebuffer framebuffer=0xBEEF	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glBindImageTexture access=0	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glBindImageTexture access=0xBEEF	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glBindImageTexture access=-1	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glBindRenderbuffer renderbuffer=-1	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glBindRenderbuffer renderbuffer=0xBEEF	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glBlendEquation mode=0	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glBlendEquationi mode=0	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glClearTexImage level=0xBEEF	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glClearTexImage level=big	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glClearTexSubImage level=0xBEEF	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glClearTexSubImage level=big	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glClearTexSubImage zoffset=-1	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glClearTexSubImage zoffset=0xBEEF	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glClearTexSubImage zoffset=1	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glClearTexSubImage zoffset=big	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glClearTexSubImage width=-1	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glClearTexSubImage height=-1	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glClearTexSubImage depth=-1	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glClearTexSubImage depth=0xBEEF	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glClearTexSubImage depth=big	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glCompressedTexImage2D border=-1	The reference page gives our answer; the driver here gives another
+guided	glCompressedTexImage2D border=0xBEEF	The reference page gives our answer; the driver here gives another
+guided	glCompressedTexImage2D border=1	The reference page gives our answer; the driver here gives another
+guided	glCompressedTexImage2D border=big	The reference page gives our answer; the driver here gives another
+guided	glCompressedTexImage3D target=GL_PROXY_TEXTURE_3D	GL 4.6 refuses a format with no 3D form as an operation, as we do; NVIDIA accepts it for the proxy and Mesa calls it an enum
+guided	glCompressedTexImage3D level=-1	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glCompressedTexImage3D level=0xBEEF	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glCompressedTexImage3D level=big	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glCompressedTexSubImage1D valid	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glCompressedTexSubImage1D target=GL_TEXTURE_1D	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glCompressedTexSubImage1D target=0	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glCompressedTexSubImage1D target=0xBEEF	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glCompressedTexSubImage1D target=-1	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glCompressedTexSubImage1D level=-1	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glCompressedTexSubImage1D level=0	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glCompressedTexSubImage1D level=0xBEEF	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glCompressedTexSubImage1D level=1	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glCompressedTexSubImage1D level=big	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glCompressedTexSubImage1D xoffset=-1	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glCompressedTexSubImage1D xoffset=0	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glCompressedTexSubImage1D xoffset=0xBEEF	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glCompressedTexSubImage1D xoffset=1	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glCompressedTexSubImage1D xoffset=big	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glCompressedTexSubImage1D width=-1	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glCompressedTexSubImage1D width=0	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glCompressedTexSubImage1D width=0xBEEF	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glCompressedTexSubImage1D width=1	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glCompressedTexSubImage1D width=big	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glCompressedTexSubImage1D format=0	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glCompressedTexSubImage1D format=0xBEEF	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glCompressedTexSubImage1D format=-1	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glCompressedTexSubImage1D imageSize=-1	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glCompressedTexSubImage1D imageSize=0	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glCompressedTexSubImage1D imageSize=0xBEEF	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glCompressedTexSubImage1D imageSize=1	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glCompressedTexSubImage1D imageSize=big	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glCopyImageSubData srcName=-1	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glCopyImageSubData srcName=0xBEEF	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glCopyImageSubData srcName=big	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glCopyTexSubImage1D level=1	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glCopyTexSubImage2D level=1	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glCopyTexSubImage3D target=GL_TEXTURE_CUBE_MAP_ARRAY	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glCopyTexSubImage3D level=1	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glDebugMessageControl valid	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glDebugMessageControl source=0	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glDebugMessageControl source=0xBEEF	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glDebugMessageControl source=-1	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glDebugMessageControl type=0	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glDebugMessageControl type=0xBEEF	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glDebugMessageControl type=-1	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glDebugMessageControl severity=0	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glDebugMessageControl severity=0xBEEF	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glDebugMessageControl severity=-1	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glDebugMessageControl count=0xBEEF	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glDebugMessageControl count=1	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glDebugMessageControl count=big	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glDebugMessageControl enabled=true	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glDebugMessageControl enabled=false	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glDrawArrays mode=GL_PATCHES	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glDrawArrays first=-1	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glDrawArraysIndirect mode=GL_PATCHES	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glDrawArraysInstanced mode=GL_PATCHES	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glDrawArraysInstancedBaseInstance mode=GL_PATCHES	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glDrawElements mode=GL_PATCHES	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glDrawElementsBaseVertex mode=GL_PATCHES	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glDrawElementsIndirect mode=GL_PATCHES	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glDrawElementsInstanced mode=GL_PATCHES	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glDrawElementsInstancedBaseInstance mode=GL_PATCHES	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glDrawElementsInstancedBaseVertex mode=GL_PATCHES	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glDrawElementsInstancedBaseVertexBaseInstance mode=GL_PATCHES	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glDrawRangeElements mode=GL_PATCHES	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glDrawRangeElementsBaseVertex mode=GL_PATCHES	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glDrawTransformFeedback mode=GL_PATCHES	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glDrawTransformFeedbackInstanced mode=GL_PATCHES	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glDrawTransformFeedbackStream mode=GL_PATCHES	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glDrawTransformFeedbackStreamInstanced mode=GL_PATCHES	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glNamedFramebufferTextureLayer level=-1	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glNamedFramebufferTextureLayer level=0xBEEF	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glNamedFramebufferTextureLayer level=big	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glNamedFramebufferTextureLayer layer=-1	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glGetActiveUniformBlockName bufSize=0	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glGetActiveUniformName bufSize=0	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glGetInternalformativ internalformat=0	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glGetInternalformativ internalformat=0xBEEF	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glGetInternalformativ internalformat=-1	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glGetInternalformati64v internalformat=0	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glGetInternalformati64v internalformat=0xBEEF	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glGetInternalformati64v internalformat=-1	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glGetProgramiv pname=GL_GEOMETRY_VERTICES_OUT	GL 4.6 refuses these for a program with no geometry shader as an operation, as we do; NVIDIA answers and Mesa calls them an enum
+guided	glGetProgramiv pname=GL_GEOMETRY_INPUT_TYPE	GL 4.6 refuses these for a program with no geometry shader as an operation, as we do; NVIDIA answers and Mesa calls them an enum
+guided	glGetProgramiv pname=GL_GEOMETRY_OUTPUT_TYPE	GL 4.6 refuses these for a program with no geometry shader as an operation, as we do; NVIDIA answers and Mesa calls them an enum
+guided	glGetProgramBinary bufSize=0xBEEF	No binary format is offered here, so there is no binary to hand back; a driver with one has room for it
+guided	glGetProgramBinary bufSize=big	No binary format is offered here, so there is no binary to hand back; a driver with one has room for it
+guided	glGetProgramPipelineiv pname=0	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glGetProgramPipelineiv pname=0xBEEF	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glGetProgramPipelineiv pname=-1	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glGetProgramPipelineInfoLog valid	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glGetProgramPipelineInfoLog bufSize=0	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glGetProgramPipelineInfoLog bufSize=0xBEEF	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glGetProgramPipelineInfoLog bufSize=1	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glGetProgramPipelineInfoLog bufSize=big	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glGetProgramResourceLocationIndex valid	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glGetProgramResourceLocationIndex programInterface=0	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glGetProgramResourceLocationIndex programInterface=0xBEEF	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glGetProgramResourceLocationIndex programInterface=-1	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glGetQueryIndexediv target=GL_TIMESTAMP	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glGetQueryBufferObjectiv offset=0xBEEF	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glGetQueryBufferObjectiv offset=1	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glGetQueryBufferObjectuiv offset=0xBEEF	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glGetQueryBufferObjectuiv offset=1	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glGetQueryBufferObjecti64v offset=0xBEEF	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glGetQueryBufferObjecti64v offset=1	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glGetQueryBufferObjectui64v offset=0xBEEF	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glGetQueryBufferObjectui64v offset=1	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glGetQueryiv target=GL_TIMESTAMP	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glGetUniformSubroutineuiv valid	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glGetUniformSubroutineuiv shadertype=GL_VERTEX_SHADER	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glGetUniformSubroutineuiv shadertype=GL_FRAGMENT_SHADER	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glGetUniformSubroutineuiv location=-1	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glGetUniformSubroutineuiv location=0xBEEF	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glInvalidateBufferData buffer=-1	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glInvalidateBufferData buffer=0	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glInvalidateBufferData buffer=0xBEEF	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glInvalidateTexImage level=1	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glInvalidateTexSubImage zoffset=-1	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glInvalidateTexSubImage zoffset=0xBEEF	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glInvalidateTexSubImage zoffset=1	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glInvalidateTexSubImage zoffset=big	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glInvalidateTexSubImage depth=-1	GL refuses a negative depth; both drivers pass over the depth of a 2D texture
+guided	glInvalidateTexSubImage depth=0xBEEF	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glInvalidateTexSubImage depth=big	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glMemoryBarrier barriers=big	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glMultiDrawArrays mode=GL_PATCHES	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glMultiDrawArraysIndirect mode=GL_PATCHES	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glMultiDrawArraysIndirectCount valid	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glMultiDrawArraysIndirectCount mode=GL_POINTS	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glMultiDrawArraysIndirectCount mode=GL_LINE_STRIP	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glMultiDrawArraysIndirectCount mode=GL_LINE_LOOP	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glMultiDrawArraysIndirectCount mode=GL_LINES	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glMultiDrawArraysIndirectCount mode=GL_LINE_STRIP_ADJACENCY	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glMultiDrawArraysIndirectCount mode=GL_LINES_ADJACENCY	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glMultiDrawArraysIndirectCount mode=GL_TRIANGLE_STRIP	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glMultiDrawArraysIndirectCount mode=GL_TRIANGLE_FAN	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glMultiDrawArraysIndirectCount mode=GL_TRIANGLES	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glMultiDrawArraysIndirectCount mode=GL_TRIANGLE_STRIP_ADJACENCY	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glMultiDrawArraysIndirectCount mode=GL_TRIANGLES_ADJACENCY	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glMultiDrawArraysIndirectCount mode=0	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glMultiDrawArraysIndirectCount drawcount=-1	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glMultiDrawArraysIndirectCount drawcount=0xBEEF	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glMultiDrawArraysIndirectCount drawcount=1	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glMultiDrawArraysIndirectCount maxdrawcount=-1	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glMultiDrawArraysIndirectCount maxdrawcount=0	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glMultiDrawArraysIndirectCount maxdrawcount=1	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glMultiDrawArraysIndirectCount stride=-1	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glMultiDrawArraysIndirectCount stride=0	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glMultiDrawArraysIndirectCount stride=0xBEEF	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glMultiDrawArraysIndirectCount stride=1	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glMultiDrawElements mode=GL_PATCHES	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glMultiDrawElementsBaseVertex mode=GL_PATCHES	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glMultiDrawElementsIndirectCount valid	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glMultiDrawElementsIndirectCount mode=GL_POINTS	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glMultiDrawElementsIndirectCount mode=GL_LINE_STRIP	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glMultiDrawElementsIndirectCount mode=GL_LINE_LOOP	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glMultiDrawElementsIndirectCount mode=GL_LINES	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glMultiDrawElementsIndirectCount mode=GL_LINE_STRIP_ADJACENCY	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glMultiDrawElementsIndirectCount mode=GL_LINES_ADJACENCY	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glMultiDrawElementsIndirectCount mode=GL_TRIANGLE_STRIP	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glMultiDrawElementsIndirectCount mode=GL_TRIANGLE_FAN	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glMultiDrawElementsIndirectCount mode=GL_TRIANGLES	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glMultiDrawElementsIndirectCount mode=GL_TRIANGLE_STRIP_ADJACENCY	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glMultiDrawElementsIndirectCount mode=GL_TRIANGLES_ADJACENCY	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glMultiDrawElementsIndirectCount mode=0	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glMultiDrawElementsIndirectCount type=GL_ELEMENT_ARRAY_BUFFER	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glMultiDrawElementsIndirectCount type=GL_UNSIGNED_BYTE	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glMultiDrawElementsIndirectCount type=GL_UNSIGNED_SHORT	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glMultiDrawElementsIndirectCount type=GL_UNSIGNED_INT	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glMultiDrawElementsIndirectCount type=0	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glMultiDrawElementsIndirectCount type=0xBEEF	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glMultiDrawElementsIndirectCount type=-1	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glMultiDrawElementsIndirectCount drawcount=-1	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glMultiDrawElementsIndirectCount drawcount=0xBEEF	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glMultiDrawElementsIndirectCount drawcount=1	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glMultiDrawElementsIndirectCount maxdrawcount=-1	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glMultiDrawElementsIndirectCount maxdrawcount=0	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glMultiDrawElementsIndirectCount maxdrawcount=1	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glMultiDrawElementsIndirectCount stride=-1	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glMultiDrawElementsIndirectCount stride=0	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glMultiDrawElementsIndirectCount stride=0xBEEF	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glMultiDrawElementsIndirectCount stride=1	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glObjectLabel length=0xBEEF	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glObjectLabel length=big	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glNamedFramebufferReadBuffer framebuffer=0	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glSampleMaski maskNumber=1	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glSamplerParameterf sampler=-1	The reference page gives our answer; the driver here gives another
+guided	glSamplerParameterf sampler=0	The reference page gives our answer; the driver here gives another
+guided	glSamplerParameterf sampler=0xBEEF	The reference page gives our answer; the driver here gives another
+guided	glSamplerParameteri sampler=-1	The reference page gives our answer; the driver here gives another
+guided	glSamplerParameteri sampler=0	The reference page gives our answer; the driver here gives another
+guided	glSamplerParameteri sampler=0xBEEF	The reference page gives our answer; the driver here gives another
+guided	glSamplerParameterfv sampler=-1	The reference page gives our answer; the driver here gives another
+guided	glSamplerParameterfv sampler=0	The reference page gives our answer; the driver here gives another
+guided	glSamplerParameterfv sampler=0xBEEF	The reference page gives our answer; the driver here gives another
+guided	glSamplerParameteriv sampler=-1	The reference page gives our answer; the driver here gives another
+guided	glSamplerParameteriv sampler=0	The reference page gives our answer; the driver here gives another
+guided	glSamplerParameteriv sampler=0xBEEF	The reference page gives our answer; the driver here gives another
+guided	glShaderBinary count=-1	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glShaderBinary length=-1	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glTexImage1D internalformat=-1	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glTexImage1D internalformat=0	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glTexImage1D internalformat=0xBEEF	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glTexImage1D internalformat=big	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glTexImage2D internalformat=0	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glTexImage2D internalformat=0xBEEF	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glTexImage2D internalformat=big	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glTexImage3D internalformat=-1	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glTexImage3D internalformat=0	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glTexImage3D internalformat=0xBEEF	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glTexImage3D internalformat=big	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glTexStorage3D target=GL_TEXTURE_CUBE_MAP_ARRAY	A cube map array whose depth is not a multiple of 6 is a value error in the Khronos suite (tex3D_validation), as we give; NVIDIA calls it an operation
+guided	glTexStorage3D target=GL_PROXY_TEXTURE_CUBE_MAP_ARRAY	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glTexStorage3DMultisample valid	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glTexStorage3DMultisample samples=-1	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glTexSubImage1D level=1	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glTexSubImage1D format=GL_DEPTH_COMPONENT	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glTexSubImage1D format=GL_STENCIL_INDEX	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glTexSubImage2D level=1	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glTexSubImage2D format=GL_DEPTH_COMPONENT	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glTexSubImage2D format=GL_STENCIL_INDEX	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glTextureSubImage2D format=GL_DEPTH_COMPONENT	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glTextureSubImage2D format=GL_STENCIL_INDEX	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glTexSubImage3D level=1	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glTexSubImage3D format=GL_DEPTH_COMPONENT	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glTexSubImage3D format=GL_STENCIL_INDEX	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glUniformSubroutinesuiv valid	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glUniformSubroutinesuiv shadertype=GL_VERTEX_SHADER	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glUniformSubroutinesuiv shadertype=GL_FRAGMENT_SHADER	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glUniformSubroutinesuiv count=-1	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glUniformSubroutinesuiv count=0	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glUniformSubroutinesuiv count=0xBEEF	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glUniformSubroutinesuiv count=1	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glUniformSubroutinesuiv count=big	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glUseProgramStages pipeline=0	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glValidateProgramPipeline pipeline=0	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glVertexAttribLFormat relativeoffset=-1	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glVertexAttribLFormat relativeoffset=0xBEEF	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glVertexAttribLFormat relativeoffset=big	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glVertexArrayAttribLFormat relativeoffset=-1	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glVertexArrayAttribLFormat relativeoffset=0xBEEF	Mesa's llvmpipe gives our answer; the driver here gives another
+guided	glVertexArrayAttribLFormat relativeoffset=big	Mesa's llvmpipe gives our answer; the driver here gives another
+modpath	glBegin [int] valid	The probe reads state between glBegin and glEnd, where GL refuses queries, so the two sides read different nothing
+modpath	glBindFramebuffer [int,int] framebuffer=-1	Mesa's llvmpipe gives our answer; the driver here gives another
+modpath	glBindFramebuffer [int,int] framebuffer=0xBEEF	Mesa's llvmpipe gives our answer; the driver here gives another
+modpath	glBindImageTexture [int,int,int,boolean,int,int,int] access=0	Mesa's llvmpipe gives our answer; the driver here gives another
+modpath	glBindImageTexture [int,int,int,boolean,int,int,int] access=0xBEEF	Mesa's llvmpipe gives our answer; the driver here gives another
+modpath	glBindImageTexture [int,int,int,boolean,int,int,int] access=-1	Mesa's llvmpipe gives our answer; the driver here gives another
+modpath	glBindImageTextures [int,int[]] valid	Mesa's llvmpipe gives our answer; the driver here gives another
+modpath	glBindImageTextures [int,int[]] first=0	Mesa's llvmpipe gives our answer; the driver here gives another
+modpath	glBindRenderbuffer [int,int] renderbuffer=-1	Mesa's llvmpipe gives our answer; the driver here gives another
+modpath	glBindRenderbuffer [int,int] renderbuffer=0xBEEF	Mesa's llvmpipe gives our answer; the driver here gives another
+modpath	glBlendColor [float,float,float,float] red=-1	A compatibility context clamps these to 0 and 1; a core one, as we report, keeps them, so a later 0 is a change for us and none for NVIDIA
+modpath	glBlendColor [float,float,float,float] red=0	A compatibility context clamps these to 0 and 1; a core one, as we report, keeps them, so a later 0 is a change for us and none for NVIDIA
+modpath	glBlendColor [float,float,float,float] green=-1	A compatibility context clamps these to 0 and 1; a core one, as we report, keeps them, so a later 0 is a change for us and none for NVIDIA
+modpath	glBlendColor [float,float,float,float] green=0	A compatibility context clamps these to 0 and 1; a core one, as we report, keeps them, so a later 0 is a change for us and none for NVIDIA
+modpath	glBlendColor [float,float,float,float] blue=-1	A compatibility context clamps these to 0 and 1; a core one, as we report, keeps them, so a later 0 is a change for us and none for NVIDIA
+modpath	glBlendColor [float,float,float,float] blue=0	A compatibility context clamps these to 0 and 1; a core one, as we report, keeps them, so a later 0 is a change for us and none for NVIDIA
+modpath	glBlendColor [float,float,float,float] alpha=-1	A compatibility context clamps these to 0 and 1; a core one, as we report, keeps them, so a later 0 is a change for us and none for NVIDIA
+modpath	glBlendColor [float,float,float,float] alpha=0	A compatibility context clamps these to 0 and 1; a core one, as we report, keeps them, so a later 0 is a change for us and none for NVIDIA
+modpath	glBlendEquation [int] mode=0	Mesa's llvmpipe gives our answer; the driver here gives another
+modpath	glClearColor [float,float,float,float] red=-1	A compatibility context clamps these to 0 and 1; a core one, as we report, keeps them, so a later 0 is a change for us and none for NVIDIA
+modpath	glClearColor [float,float,float,float] green=-1	A compatibility context clamps these to 0 and 1; a core one, as we report, keeps them, so a later 0 is a change for us and none for NVIDIA
+modpath	glClearColor [float,float,float,float] blue=-1	A compatibility context clamps these to 0 and 1; a core one, as we report, keeps them, so a later 0 is a change for us and none for NVIDIA
+modpath	glClearColor [float,float,float,float] alpha=-1	A compatibility context clamps these to 0 and 1; a core one, as we report, keeps them, so a later 0 is a change for us and none for NVIDIA
+modpath	glClearStencil [int] s=-1	GL masks the value to the stencil bits, which we report; NVIDIA reports what was given
+modpath	glClearStencil [int] s=0xBEEF	GL masks the value to the stencil bits, which we report; NVIDIA reports what was given
+modpath	glClearStencil [int] s=big	GL masks the value to the stencil bits, which we report; NVIDIA reports what was given
+modpath	glClearTexImage [int,int,int,int,ByteBuffer] level=0xBEEF	Mesa's llvmpipe gives our answer; the driver here gives another
+modpath	glClearTexImage [int,int,int,int,ByteBuffer] level=big	Mesa's llvmpipe gives our answer; the driver here gives another
+modpath	glCopyImageSubData [int,int,int,int,int,int,int,int,int,int,int,int,int,int,int] srcName=-1	Mesa's llvmpipe gives our answer; the driver here gives another
+modpath	glCopyImageSubData [int,int,int,int,int,int,int,int,int,int,int,int,int,int,int] srcName=0xBEEF	Mesa's llvmpipe gives our answer; the driver here gives another
+modpath	glCopyImageSubData [int,int,int,int,int,int,int,int,int,int,int,int,int,int,int] srcName=big	Mesa's llvmpipe gives our answer; the driver here gives another
+modpath	glCopyTexSubImage1D [int,int,int,int,int,int] level=1	Mesa's llvmpipe gives our answer; the driver here gives another
+modpath	glCopyTexSubImage2D [int,int,int,int,int,int,int,int] level=1	Mesa's llvmpipe gives our answer; the driver here gives another
+modpath	glCopyTexSubImage3D [int,int,int,int,int,int,int,int,int] target=GL_TEXTURE_CUBE_MAP_ARRAY	Mesa's llvmpipe gives our answer; the driver here gives another
+modpath	glCopyTexSubImage3D [int,int,int,int,int,int,int,int,int] level=1	Mesa's llvmpipe gives our answer; the driver here gives another
+modpath	glDrawArrays [int,int,int] mode=GL_PATCHES	Mesa's llvmpipe gives our answer; the driver here gives another
+modpath	glDrawArrays [int,int,int] first=-1	Mesa's llvmpipe gives our answer; the driver here gives another
+modpath	glDrawArraysInstanced [int,int,int,int] mode=GL_PATCHES	Mesa's llvmpipe gives our answer; the driver here gives another
+modpath	glDrawElements [int,ByteBuffer] mode=GL_PATCHES	Mesa's llvmpipe gives our answer; the driver here gives another
+modpath	glDrawElements [int,IntBuffer] mode=GL_PATCHES	Mesa's llvmpipe gives our answer; the driver here gives another
+modpath	glDrawElements [int,ShortBuffer] mode=GL_PATCHES	Mesa's llvmpipe gives our answer; the driver here gives another
+modpath	glDrawElements [int,int,int,long] mode=GL_PATCHES	Mesa's llvmpipe gives our answer; the driver here gives another
+modpath	glDrawElementsBaseVertex [int,int,int,long,int] mode=GL_PATCHES	Mesa's llvmpipe gives our answer; the driver here gives another
+modpath	glDrawElementsInstanced [int,int,int,long,int] mode=GL_PATCHES	Mesa's llvmpipe gives our answer; the driver here gives another
+modpath	glDrawRangeElements [int,int,int,int,int,long] mode=GL_PATCHES	Mesa's llvmpipe gives our answer; the driver here gives another
+modpath	glDrawRangeElementsBaseVertex [int,int,int,int,int,long,int] mode=GL_PATCHES	Mesa's llvmpipe gives our answer; the driver here gives another
+modpath	glEnablei [int,int] index=1	NVIDIA reports GL_BLEND enabled once any buffer is; GL ties that query to buffer 0, as we do
+modpath	glGetProgramInfoLog [int,int] maxLength=-1	LWJGL refuses a negative size before the driver sees it, where GLSM goes on to GL
+modpath	glGetProgrami [int,int] pname=GL_GEOMETRY_VERTICES_OUT	GL 4.6 refuses these for a program with no geometry shader as an operation, as we do; NVIDIA answers and Mesa calls them an enum
+modpath	glGetProgrami [int,int] pname=GL_GEOMETRY_INPUT_TYPE	GL 4.6 refuses these for a program with no geometry shader as an operation, as we do; NVIDIA answers and Mesa calls them an enum
+modpath	glGetProgrami [int,int] pname=GL_GEOMETRY_OUTPUT_TYPE	GL 4.6 refuses these for a program with no geometry shader as an operation, as we do; NVIDIA answers and Mesa calls them an enum
+modpath	glGetShaderInfoLog [int,int] maxLength=-1	LWJGL refuses a negative size before the driver sees it, where GLSM goes on to GL
+modpath	glGetShaderSource [int,int] bufSize=-1	LWJGL refuses a negative size before the driver sees it, where GLSM goes on to GL
+modpath	glMemoryBarrier [int] barriers=big	Mesa's llvmpipe gives our answer; the driver here gives another
+modpath	glMultiDrawArrays [int,IntBuffer,IntBuffer] mode=GL_PATCHES	Mesa's llvmpipe gives our answer; the driver here gives another
+modpath	glMultiDrawArraysIndirectCount [int,long,long,int,int] valid	Mesa's llvmpipe gives our answer; the driver here gives another
+modpath	glMultiDrawArraysIndirectCount [int,long,long,int,int] mode=GL_POINTS	Mesa's llvmpipe gives our answer; the driver here gives another
+modpath	glMultiDrawArraysIndirectCount [int,long,long,int,int] mode=GL_LINE_STRIP	Mesa's llvmpipe gives our answer; the driver here gives another
+modpath	glMultiDrawArraysIndirectCount [int,long,long,int,int] mode=GL_LINE_LOOP	Mesa's llvmpipe gives our answer; the driver here gives another
+modpath	glMultiDrawArraysIndirectCount [int,long,long,int,int] mode=GL_LINES	Mesa's llvmpipe gives our answer; the driver here gives another
+modpath	glMultiDrawArraysIndirectCount [int,long,long,int,int] mode=GL_LINE_STRIP_ADJACENCY	Mesa's llvmpipe gives our answer; the driver here gives another
+modpath	glMultiDrawArraysIndirectCount [int,long,long,int,int] mode=GL_LINES_ADJACENCY	Mesa's llvmpipe gives our answer; the driver here gives another
+modpath	glMultiDrawArraysIndirectCount [int,long,long,int,int] mode=GL_TRIANGLE_STRIP	Mesa's llvmpipe gives our answer; the driver here gives another
+modpath	glMultiDrawArraysIndirectCount [int,long,long,int,int] mode=GL_TRIANGLE_FAN	Mesa's llvmpipe gives our answer; the driver here gives another
+modpath	glMultiDrawArraysIndirectCount [int,long,long,int,int] mode=GL_TRIANGLES	Mesa's llvmpipe gives our answer; the driver here gives another
+modpath	glMultiDrawArraysIndirectCount [int,long,long,int,int] mode=GL_TRIANGLE_STRIP_ADJACENCY	Mesa's llvmpipe gives our answer; the driver here gives another
+modpath	glMultiDrawArraysIndirectCount [int,long,long,int,int] mode=GL_TRIANGLES_ADJACENCY	Mesa's llvmpipe gives our answer; the driver here gives another
+modpath	glMultiDrawArraysIndirectCount [int,long,long,int,int] mode=0	Mesa's llvmpipe gives our answer; the driver here gives another
+modpath	glMultiDrawArraysIndirectCount [int,long,long,int,int] drawcount=-1	Mesa's llvmpipe gives our answer; the driver here gives another
+modpath	glMultiDrawArraysIndirectCount [int,long,long,int,int] drawcount=0xBEEF	Mesa's llvmpipe gives our answer; the driver here gives another
+modpath	glMultiDrawArraysIndirectCount [int,long,long,int,int] drawcount=1	Mesa's llvmpipe gives our answer; the driver here gives another
+modpath	glMultiDrawArraysIndirectCount [int,long,long,int,int] maxdrawcount=-1	Mesa's llvmpipe gives our answer; the driver here gives another
+modpath	glMultiDrawArraysIndirectCount [int,long,long,int,int] maxdrawcount=0	Mesa's llvmpipe gives our answer; the driver here gives another
+modpath	glMultiDrawArraysIndirectCount [int,long,long,int,int] maxdrawcount=1	Mesa's llvmpipe gives our answer; the driver here gives another
+modpath	glMultiDrawArraysIndirectCount [int,long,long,int,int] stride=-1	Mesa's llvmpipe gives our answer; the driver here gives another
+modpath	glMultiDrawArraysIndirectCount [int,long,long,int,int] stride=0	Mesa's llvmpipe gives our answer; the driver here gives another
+modpath	glMultiDrawArraysIndirectCount [int,long,long,int,int] stride=0xBEEF	Mesa's llvmpipe gives our answer; the driver here gives another
+modpath	glMultiDrawArraysIndirectCount [int,long,long,int,int] stride=1	Mesa's llvmpipe gives our answer; the driver here gives another
+modpath	glMultiDrawElementsIndirectCount [int,int,long,long,int,int] valid	Mesa's llvmpipe gives our answer; the driver here gives another
+modpath	glMultiDrawElementsIndirectCount [int,int,long,long,int,int] mode=GL_POINTS	Mesa's llvmpipe gives our answer; the driver here gives another
+modpath	glMultiDrawElementsIndirectCount [int,int,long,long,int,int] mode=GL_LINE_STRIP	Mesa's llvmpipe gives our answer; the driver here gives another
+modpath	glMultiDrawElementsIndirectCount [int,int,long,long,int,int] mode=GL_LINE_LOOP	Mesa's llvmpipe gives our answer; the driver here gives another
+modpath	glMultiDrawElementsIndirectCount [int,int,long,long,int,int] mode=GL_LINES	Mesa's llvmpipe gives our answer; the driver here gives another
+modpath	glMultiDrawElementsIndirectCount [int,int,long,long,int,int] mode=GL_LINE_STRIP_ADJACENCY	Mesa's llvmpipe gives our answer; the driver here gives another
+modpath	glMultiDrawElementsIndirectCount [int,int,long,long,int,int] mode=GL_LINES_ADJACENCY	Mesa's llvmpipe gives our answer; the driver here gives another
+modpath	glMultiDrawElementsIndirectCount [int,int,long,long,int,int] mode=GL_TRIANGLE_STRIP	Mesa's llvmpipe gives our answer; the driver here gives another
+modpath	glMultiDrawElementsIndirectCount [int,int,long,long,int,int] mode=GL_TRIANGLE_FAN	Mesa's llvmpipe gives our answer; the driver here gives another
+modpath	glMultiDrawElementsIndirectCount [int,int,long,long,int,int] mode=GL_TRIANGLES	Mesa's llvmpipe gives our answer; the driver here gives another
+modpath	glMultiDrawElementsIndirectCount [int,int,long,long,int,int] mode=GL_TRIANGLE_STRIP_ADJACENCY	Mesa's llvmpipe gives our answer; the driver here gives another
+modpath	glMultiDrawElementsIndirectCount [int,int,long,long,int,int] mode=GL_TRIANGLES_ADJACENCY	Mesa's llvmpipe gives our answer; the driver here gives another
+modpath	glMultiDrawElementsIndirectCount [int,int,long,long,int,int] mode=0	Mesa's llvmpipe gives our answer; the driver here gives another
+modpath	glMultiDrawElementsIndirectCount [int,int,long,long,int,int] type=GL_ELEMENT_ARRAY_BUFFER	Mesa's llvmpipe gives our answer; the driver here gives another
+modpath	glMultiDrawElementsIndirectCount [int,int,long,long,int,int] type=GL_UNSIGNED_BYTE	Mesa's llvmpipe gives our answer; the driver here gives another
+modpath	glMultiDrawElementsIndirectCount [int,int,long,long,int,int] type=GL_UNSIGNED_SHORT	Mesa's llvmpipe gives our answer; the driver here gives another
+modpath	glMultiDrawElementsIndirectCount [int,int,long,long,int,int] type=GL_UNSIGNED_INT	Mesa's llvmpipe gives our answer; the driver here gives another
+modpath	glMultiDrawElementsIndirectCount [int,int,long,long,int,int] type=0	Mesa's llvmpipe gives our answer; the driver here gives another
+modpath	glMultiDrawElementsIndirectCount [int,int,long,long,int,int] type=0xBEEF	Mesa's llvmpipe gives our answer; the driver here gives another
+modpath	glMultiDrawElementsIndirectCount [int,int,long,long,int,int] type=-1	Mesa's llvmpipe gives our answer; the driver here gives another
+modpath	glMultiDrawElementsIndirectCount [int,int,long,long,int,int] drawcount=-1	Mesa's llvmpipe gives our answer; the driver here gives another
+modpath	glMultiDrawElementsIndirectCount [int,int,long,long,int,int] drawcount=0xBEEF	Mesa's llvmpipe gives our answer; the driver here gives another
+modpath	glMultiDrawElementsIndirectCount [int,int,long,long,int,int] drawcount=1	Mesa's llvmpipe gives our answer; the driver here gives another
+modpath	glMultiDrawElementsIndirectCount [int,int,long,long,int,int] maxdrawcount=-1	Mesa's llvmpipe gives our answer; the driver here gives another
+modpath	glMultiDrawElementsIndirectCount [int,int,long,long,int,int] maxdrawcount=0	Mesa's llvmpipe gives our answer; the driver here gives another
+modpath	glMultiDrawElementsIndirectCount [int,int,long,long,int,int] maxdrawcount=1	Mesa's llvmpipe gives our answer; the driver here gives another
+modpath	glMultiDrawElementsIndirectCount [int,int,long,long,int,int] stride=-1	Mesa's llvmpipe gives our answer; the driver here gives another
+modpath	glMultiDrawElementsIndirectCount [int,int,long,long,int,int] stride=0	Mesa's llvmpipe gives our answer; the driver here gives another
+modpath	glMultiDrawElementsIndirectCount [int,int,long,long,int,int] stride=0xBEEF	Mesa's llvmpipe gives our answer; the driver here gives another
+modpath	glMultiDrawElementsIndirectCount [int,int,long,long,int,int] stride=1	Mesa's llvmpipe gives our answer; the driver here gives another
+modpath	glNamedFramebufferTextureLayer [int,int,int,int,int] level=-1	Mesa's llvmpipe gives our answer; the driver here gives another
+modpath	glNamedFramebufferTextureLayer [int,int,int,int,int] level=0xBEEF	Mesa's llvmpipe gives our answer; the driver here gives another
+modpath	glNamedFramebufferTextureLayer [int,int,int,int,int] level=big	Mesa's llvmpipe gives our answer; the driver here gives another
+modpath	glNamedFramebufferTextureLayer [int,int,int,int,int] layer=-1	Mesa's llvmpipe gives our answer; the driver here gives another
+modpath	glNewList [int,int] valid	Mesa's llvmpipe gives our answer; the driver here gives another
+modpath	glSamplerParameterf [int,int,float] sampler=-1	The reference page gives our answer; the driver here gives another
+modpath	glSamplerParameterf [int,int,float] sampler=0	The reference page gives our answer; the driver here gives another
+modpath	glSamplerParameterf [int,int,float] sampler=0xBEEF	The reference page gives our answer; the driver here gives another
+modpath	glSamplerParameteri [int,int,int] sampler=-1	The reference page gives our answer; the driver here gives another
+modpath	glSamplerParameteri [int,int,int] sampler=0	The reference page gives our answer; the driver here gives another
+modpath	glSamplerParameteri [int,int,int] sampler=0xBEEF	The reference page gives our answer; the driver here gives another
+modpath	glStencilFunc [int,int,int] ref=0xBEEF	GL clamps the reference to the stencil range, which we report; NVIDIA reports what was given
+modpath	glStencilFunc [int,int,int] ref=big	GL clamps the reference to the stencil range, which we report; NVIDIA reports what was given
+modpath	glStencilFuncSeparate [int,int,int,int] ref=0xBEEF	GL clamps the reference to the stencil range, which we report; NVIDIA reports what was given
+modpath	glStencilFuncSeparate [int,int,int,int] ref=big	GL clamps the reference to the stencil range, which we report; NVIDIA reports what was given
+modpath	glTexImage1D [int,int,int,int,int,int,int,ByteBuffer] internalformat=-1	The reference page gives our answer; the driver here gives another
+modpath	glTexImage1D [int,int,int,int,int,int,int,ByteBuffer] internalformat=0	The reference page gives our answer; the driver here gives another
+modpath	glTexImage1D [int,int,int,int,int,int,int,ByteBuffer] internalformat=0xBEEF	The reference page gives our answer; the driver here gives another
+modpath	glTexImage1D [int,int,int,int,int,int,int,ByteBuffer] internalformat=big	The reference page gives our answer; the driver here gives another
+modpath	glTexImage2D [int,int,int,int,int,int,int,int,DoubleBuffer] internalformat=0	The reference page gives our answer; the driver here gives another
+modpath	glTexImage2D [int,int,int,int,int,int,int,int,DoubleBuffer] internalformat=0xBEEF	The reference page gives our answer; the driver here gives another
+modpath	glTexImage2D [int,int,int,int,int,int,int,int,DoubleBuffer] internalformat=big	The reference page gives our answer; the driver here gives another
+modpath	glTexImage2D [int,int,int,int,int,int,int,int,IntBuffer] internalformat=0	The reference page gives our answer; the driver here gives another
+modpath	glTexImage2D [int,int,int,int,int,int,int,int,IntBuffer] internalformat=0xBEEF	The reference page gives our answer; the driver here gives another
+modpath	glTexImage2D [int,int,int,int,int,int,int,int,IntBuffer] internalformat=big	The reference page gives our answer; the driver here gives another
+modpath	glTexImage2D [int,int,int,int,int,int,int,int,long] internalformat=0	The reference page gives our answer; the driver here gives another
+modpath	glTexImage2D [int,int,int,int,int,int,int,int,long] internalformat=0xBEEF	The reference page gives our answer; the driver here gives another
+modpath	glTexImage2D [int,int,int,int,int,int,int,int,long] internalformat=big	The reference page gives our answer; the driver here gives another
+modpath	glTexImage2D [int,int,int,int,int,int,int,int,FloatBuffer] internalformat=0	The reference page gives our answer; the driver here gives another
+modpath	glTexImage2D [int,int,int,int,int,int,int,int,FloatBuffer] internalformat=0xBEEF	The reference page gives our answer; the driver here gives another
+modpath	glTexImage2D [int,int,int,int,int,int,int,int,FloatBuffer] internalformat=big	The reference page gives our answer; the driver here gives another
+modpath	glTexImage2D [int,int,int,int,int,int,int,int,ByteBuffer] internalformat=0	The reference page gives our answer; the driver here gives another
+modpath	glTexImage2D [int,int,int,int,int,int,int,int,ByteBuffer] internalformat=0xBEEF	The reference page gives our answer; the driver here gives another
+modpath	glTexImage2D [int,int,int,int,int,int,int,int,ByteBuffer] internalformat=big	The reference page gives our answer; the driver here gives another
+modpath	glTexImage3D [int,int,int,int,int,int,int,int,int,ByteBuffer] internalformat=-1	The reference page gives our answer; the driver here gives another
+modpath	glTexImage3D [int,int,int,int,int,int,int,int,int,ByteBuffer] internalformat=0	The reference page gives our answer; the driver here gives another
+modpath	glTexImage3D [int,int,int,int,int,int,int,int,int,ByteBuffer] internalformat=0xBEEF	The reference page gives our answer; the driver here gives another
+modpath	glTexImage3D [int,int,int,int,int,int,int,int,int,ByteBuffer] internalformat=big	The reference page gives our answer; the driver here gives another
+modpath	glTexImage3D [int,int,int,int,int,int,int,int,int,IntBuffer] internalformat=-1	The reference page gives our answer; the driver here gives another
+modpath	glTexImage3D [int,int,int,int,int,int,int,int,int,IntBuffer] internalformat=0	The reference page gives our answer; the driver here gives another
+modpath	glTexImage3D [int,int,int,int,int,int,int,int,int,IntBuffer] internalformat=0xBEEF	The reference page gives our answer; the driver here gives another
+modpath	glTexImage3D [int,int,int,int,int,int,int,int,int,IntBuffer] internalformat=big	The reference page gives our answer; the driver here gives another
+modpath	glTexSubImage1D [int,int,int,int,int,int,ByteBuffer] level=1	GL 4.6 refuses a level with no image as an operation, as we and Mesa do; NVIDIA calls it a value
+modpath	glTexSubImage1D [int,int,int,int,int,int,ByteBuffer] format=GL_DEPTH_COMPONENT	GL refuses depth pixels for a colour image, as we and Mesa do; NVIDIA accepts them
+modpath	glTexSubImage1D [int,int,int,int,int,int,ByteBuffer] format=GL_STENCIL_INDEX	GL refuses stencil pixels for a colour image, as we and Mesa do; NVIDIA accepts them
+modpath	glTexSubImage2D [int,int,int,int,int,int,int,int,ByteBuffer] level=1	GL 4.6 refuses a level with no image as an operation, as we and Mesa do; NVIDIA calls it a value
+modpath	glTexSubImage2D [int,int,int,int,int,int,int,int,ByteBuffer] format=GL_DEPTH_COMPONENT	GL refuses depth pixels for a colour image, as we and Mesa do; NVIDIA accepts them
+modpath	glTexSubImage2D [int,int,int,int,int,int,int,int,ByteBuffer] format=GL_STENCIL_INDEX	GL refuses stencil pixels for a colour image, as we and Mesa do; NVIDIA accepts them
+modpath	glTexSubImage2D [int,int,int,int,int,int,int,int,long] level=1	GL 4.6 refuses a level with no image as an operation, as we and Mesa do; NVIDIA calls it a value
+modpath	glTexSubImage2D [int,int,int,int,int,int,int,int,long] format=GL_DEPTH_COMPONENT	GL refuses depth pixels for a colour image, as we and Mesa do; NVIDIA accepts them
+modpath	glTexSubImage2D [int,int,int,int,int,int,int,int,long] format=GL_STENCIL_INDEX	GL refuses stencil pixels for a colour image, as we and Mesa do; NVIDIA accepts them
+modpath	glTexSubImage2D [int,int,int,int,int,int,int,int,IntBuffer] level=1	GL 4.6 refuses a level with no image as an operation, as we and Mesa do; NVIDIA calls it a value
+modpath	glTexSubImage2D [int,int,int,int,int,int,int,int,IntBuffer] format=GL_DEPTH_COMPONENT	GL refuses depth pixels for a colour image, as we and Mesa do; NVIDIA accepts them
+modpath	glTexSubImage2D [int,int,int,int,int,int,int,int,IntBuffer] format=GL_STENCIL_INDEX	GL refuses stencil pixels for a colour image, as we and Mesa do; NVIDIA accepts them
+modpath	glTexSubImage3D [int,int,int,int,int,int,int,int,int,int,ByteBuffer] level=1	GL 4.6 refuses a level with no image as an operation, as we and Mesa do; NVIDIA calls it a value
+modpath	glTexSubImage3D [int,int,int,int,int,int,int,int,int,int,ByteBuffer] format=GL_DEPTH_COMPONENT	GL refuses depth pixels for a colour image, as we and Mesa do; NVIDIA accepts them
+modpath	glTexSubImage3D [int,int,int,int,int,int,int,int,int,int,ByteBuffer] format=GL_STENCIL_INDEX	GL refuses stencil pixels for a colour image, as we and Mesa do; NVIDIA accepts them
+modpath	glViewport [int,int,int,int] x=0xBEEF	GL clamps the origin to GL_VIEWPORT_BOUNDS_RANGE, which we report; NVIDIA reports what was given
+modpath	glViewport [int,int,int,int] x=big	GL clamps the origin to GL_VIEWPORT_BOUNDS_RANGE, which we report; NVIDIA reports what was given
+modpath	glViewport [int,int,int,int] y=0xBEEF	GL clamps the origin to GL_VIEWPORT_BOUNDS_RANGE, which we report; NVIDIA reports what was given
+modpath	glViewport [int,int,int,int] y=big	GL clamps the origin to GL_VIEWPORT_BOUNDS_RANGE, which we report; NVIDIA reports what was given

@@ -11,6 +11,7 @@ import com.gtnewhorizons.angelica.glsm.stacks.StencilStateStack;
 import com.gtnewhorizons.angelica.glsm.states.AlphaState;
 import org.lwjgl.opengl.GL11;
 
+import static com.gtnewhorizons.angelica.glsm.GLStateManager.recordError;
 import static com.gtnewhorizons.angelica.glsm.GLStateManager.beforeUncapturedStateChange;
 import static com.gtnewhorizons.angelica.glsm.GLStateManager.ctx;
 import static com.gtnewhorizons.angelica.glsm.GLStateManager.isCachingEnabled;
@@ -35,6 +36,7 @@ public final class GLSMDepthStencilAlpha {
     }
 
     public static void glDepthFunc(int func) {
+        if (!RENDER_BACKEND.checks().depthFunc(func)) return;
         final GLContextState glCtx = ctx();
         glCtx.exitCapture.write(ExitStateCapture.DEPTH_FUNC);
         final RecordMode mode = DisplayListManager.getRecordMode();
@@ -155,6 +157,10 @@ public final class GLSMDepthStencilAlpha {
     }
 
     public static void glAlphaFunc(int function, float reference) {
+        if (function < GL11.GL_NEVER || function > GL11.GL_ALWAYS) {
+            recordError(GL11.GL_INVALID_ENUM);
+            return;
+        }
         final GLContextState glCtx = ctx();
         glCtx.exitCapture.writeAlpha();
         final RecordMode mode = DisplayListManager.getRecordMode();
@@ -222,7 +228,17 @@ public final class GLSMDepthStencilAlpha {
         RENDER_BACKEND.depthRange(near, far);
     }
 
+    /** Aims the one-sided stencil calls at a face, for backends taking EXT_stencil_two_side; 0 leaves them applying to both. */
+    public static void setStencilFace(int face) {
+        ctx().stencilFace = face;
+    }
+
     public static void glStencilFunc(int func, int ref, int mask) {
+        if (!RENDER_BACKEND.checks().stencilFunc(func)) return;
+        if (ctx().stencilFace != 0) {
+            glStencilFuncSeparate(ctx().stencilFace, func, ref, mask);
+            return;
+        }
         rejectExitCapture();
         final GLContextState glCtx = ctx();
         final RecordMode mode = DisplayListManager.getRecordMode();
@@ -232,16 +248,21 @@ public final class GLSMDepthStencilAlpha {
                 return;
             }
         }
-        final int clampedMask = mask & glCtx.stencilBitMask;
+        if (RENDER_BACKEND.emulatesGL()) ref = clampStencilRef(glCtx, ref);
         final boolean caching = isCachingEnabled();
-        if (!caching || glCtx.stencilState.getFuncFront() != func || glCtx.stencilState.getRefFront() != ref || glCtx.stencilState.getValueMaskFront() != clampedMask) {
+        if (!caching || glCtx.stencilState.getFuncFront() != func || glCtx.stencilState.getRefFront() != ref || glCtx.stencilState.getValueMaskFront() != mask
+            || glCtx.stencilState.getFuncBack() != func || glCtx.stencilState.getRefBack() != ref || glCtx.stencilState.getValueMaskBack() != mask) {
             beforeUncapturedStateChange();
-            mod(glCtx.stencilState).setFunc(func, ref, clampedMask);
-            RENDER_BACKEND.stencilFunc(func, ref, clampedMask);
+            mod(glCtx.stencilState).setFunc(func, ref, mask);
+            RENDER_BACKEND.stencilFunc(func, ref, mask);
         }
     }
 
     public static void glStencilMask(int mask) {
+        if (ctx().stencilFace != 0) {
+            glStencilMaskSeparate(ctx().stencilFace, mask);
+            return;
+        }
         rejectExitCapture();
         final GLContextState glCtx = ctx();
         final RecordMode mode = DisplayListManager.getRecordMode();
@@ -251,16 +272,20 @@ public final class GLSMDepthStencilAlpha {
                 return;
             }
         }
-        final int clampedMask = mask & glCtx.stencilBitMask;
         final boolean caching = isCachingEnabled();
-        if (!caching || glCtx.stencilState.getWriteMaskFront() != clampedMask) {
+        if (!caching || glCtx.stencilState.getWriteMaskFront() != mask || glCtx.stencilState.getWriteMaskBack() != mask) {
             beforeUncapturedStateChange();
-            mod(glCtx.stencilState).setWriteMask(clampedMask);
-            RENDER_BACKEND.stencilMask(clampedMask);
+            mod(glCtx.stencilState).setWriteMask(mask);
+            RENDER_BACKEND.stencilMask(mask);
         }
     }
 
     public static void glStencilOp(int fail, int zfail, int zpass) {
+        if (!RENDER_BACKEND.checks().stencilOp(fail, zfail, zpass)) return;
+        if (ctx().stencilFace != 0) {
+            glStencilOpSeparate(ctx().stencilFace, fail, zfail, zpass);
+            return;
+        }
         rejectExitCapture();
         final GLContextState glCtx = ctx();
         final RecordMode mode = DisplayListManager.getRecordMode();
@@ -271,11 +296,21 @@ public final class GLSMDepthStencilAlpha {
             }
         }
         final boolean caching = isCachingEnabled();
-        if (!caching || glCtx.stencilState.getFailOpFront() != fail || glCtx.stencilState.getZFailOpFront() != zfail || glCtx.stencilState.getZPassOpFront() != zpass) {
+        if (!caching || glCtx.stencilState.getFailOpFront() != fail || glCtx.stencilState.getZFailOpFront() != zfail || glCtx.stencilState.getZPassOpFront() != zpass
+            || glCtx.stencilState.getFailOpBack() != fail || glCtx.stencilState.getZFailOpBack() != zfail || glCtx.stencilState.getZPassOpBack() != zpass) {
             beforeUncapturedStateChange();
             mod(glCtx.stencilState).setOp(fail, zfail, zpass);
             RENDER_BACKEND.stencilOp(fail, zfail, zpass);
         }
+    }
+
+    /** GL clamps the reference to the stencil range, where a native API masks it instead. */
+    private static int clampStencilRef(GLContextState glCtx, int ref) {
+        return Math.max(0, Math.min(ref, stencilBits(glCtx)));
+    }
+
+    private static int stencilBits(GLContextState glCtx) {
+        return glCtx.stencilBitMask == 0xFFFFFFFF ? 0xFF : glCtx.stencilBitMask;
     }
 
     public static void glClearStencil(int s) {
@@ -289,13 +324,15 @@ public final class GLSMDepthStencilAlpha {
             }
         }
         final boolean caching = isCachingEnabled();
-        if (!caching || glCtx.stencilState.getClearValue() != s) {
-            mod(glCtx.stencilState).setClearValue(s);
+        final int kept = s & stencilBits(glCtx);
+        if (!caching || glCtx.stencilState.getClearValue() != kept) {
+            mod(glCtx.stencilState).setClearValue(kept);
             RENDER_BACKEND.clearStencil(s);
         }
     }
 
     public static void glStencilFuncSeparate(int face, int func, int ref, int mask) {
+        if (!RENDER_BACKEND.checks().stencilFuncSeparate(face, func)) return;
         final GLContextState glCtx = ctx();
         final RecordMode mode = DisplayListManager.getRecordMode();
         if (mode != RecordMode.NONE) {
@@ -305,15 +342,15 @@ public final class GLSMDepthStencilAlpha {
             }
         }
         beforeUncapturedStateChange();
-        final int clampedMask = mask & glCtx.stencilBitMask;
+        if (RENDER_BACKEND.emulatesGL()) ref = clampStencilRef(glCtx, ref);
         final boolean caching = isCachingEnabled();
         boolean needsUpdate = !caching;
         if (!needsUpdate) {
             if (face == GL11.GL_FRONT || face == GL11.GL_FRONT_AND_BACK) {
-                needsUpdate = glCtx.stencilState.getFuncFront() != func || glCtx.stencilState.getRefFront() != ref || glCtx.stencilState.getValueMaskFront() != clampedMask;
+                needsUpdate = glCtx.stencilState.getFuncFront() != func || glCtx.stencilState.getRefFront() != ref || glCtx.stencilState.getValueMaskFront() != mask;
             }
             if (!needsUpdate && (face == GL11.GL_BACK || face == GL11.GL_FRONT_AND_BACK)) {
-                needsUpdate = glCtx.stencilState.getFuncBack() != func || glCtx.stencilState.getRefBack() != ref || glCtx.stencilState.getValueMaskBack() != clampedMask;
+                needsUpdate = glCtx.stencilState.getFuncBack() != func || glCtx.stencilState.getRefBack() != ref || glCtx.stencilState.getValueMaskBack() != mask;
             }
         }
         if (needsUpdate) {
@@ -321,18 +358,19 @@ public final class GLSMDepthStencilAlpha {
             if (face == GL11.GL_FRONT || face == GL11.GL_FRONT_AND_BACK) {
                 glCtx.stencilState.setFuncFront(func);
                 glCtx.stencilState.setRefFront(ref);
-                glCtx.stencilState.setValueMaskFront(clampedMask);
+                glCtx.stencilState.setValueMaskFront(mask);
             }
             if (face == GL11.GL_BACK || face == GL11.GL_FRONT_AND_BACK) {
                 glCtx.stencilState.setFuncBack(func);
                 glCtx.stencilState.setRefBack(ref);
-                glCtx.stencilState.setValueMaskBack(clampedMask);
+                glCtx.stencilState.setValueMaskBack(mask);
             }
-            RENDER_BACKEND.stencilFuncSeparate(face, func, ref, clampedMask);
+            RENDER_BACKEND.stencilFuncSeparate(face, func, ref, mask);
         }
     }
 
     public static void glStencilMaskSeparate(int face, int mask) {
+        if (!RENDER_BACKEND.checks().stencilMaskSeparate(face)) return;
         final GLContextState glCtx = ctx();
         final RecordMode mode = DisplayListManager.getRecordMode();
         if (mode != RecordMode.NONE) {
@@ -342,30 +380,30 @@ public final class GLSMDepthStencilAlpha {
             }
         }
         beforeUncapturedStateChange();
-        final int clampedMask = mask & glCtx.stencilBitMask;
         final boolean caching = isCachingEnabled();
         boolean needsUpdate = !caching;
         if (!needsUpdate) {
             if (face == GL11.GL_FRONT || face == GL11.GL_FRONT_AND_BACK) {
-                needsUpdate = glCtx.stencilState.getWriteMaskFront() != clampedMask;
+                needsUpdate = glCtx.stencilState.getWriteMaskFront() != mask;
             }
             if (!needsUpdate && (face == GL11.GL_BACK || face == GL11.GL_FRONT_AND_BACK)) {
-                needsUpdate = glCtx.stencilState.getWriteMaskBack() != clampedMask;
+                needsUpdate = glCtx.stencilState.getWriteMaskBack() != mask;
             }
         }
         if (needsUpdate) {
             mod(glCtx.stencilState);
             if (face == GL11.GL_FRONT || face == GL11.GL_FRONT_AND_BACK) {
-                glCtx.stencilState.setWriteMaskFront(clampedMask);
+                glCtx.stencilState.setWriteMaskFront(mask);
             }
             if (face == GL11.GL_BACK || face == GL11.GL_FRONT_AND_BACK) {
-                glCtx.stencilState.setWriteMaskBack(clampedMask);
+                glCtx.stencilState.setWriteMaskBack(mask);
             }
-            RENDER_BACKEND.stencilMaskSeparate(face, clampedMask);
+            RENDER_BACKEND.stencilMaskSeparate(face, mask);
         }
     }
 
     public static void glStencilOpSeparate(int face, int sfail, int dpfail, int dppass) {
+        if (!RENDER_BACKEND.checks().stencilOpSeparate(face, sfail, dpfail, dppass)) return;
         final GLContextState glCtx = ctx();
         final RecordMode mode = DisplayListManager.getRecordMode();
         if (mode != RecordMode.NONE) {

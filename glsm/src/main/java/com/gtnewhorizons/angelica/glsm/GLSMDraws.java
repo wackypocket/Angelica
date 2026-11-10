@@ -9,6 +9,7 @@ import com.gtnewhorizons.angelica.glsm.ffp.VAOManager;
 import com.gtnewhorizons.angelica.glsm.recording.CommandRecorder;
 import com.gtnewhorizons.angelica.glsm.recording.CompiledDisplayList;
 import com.gtnewhorizons.angelica.glsm.recording.ImmediateModeRecorder;
+import com.gtnewhorizons.angelica.glsm.recording.commands.DisplayListCommand;
 import com.gtnewhorizons.angelica.glsm.recording.commands.IndexedDrawCapture;
 import com.gtnewhorizons.angelica.glsm.streaming.LineQuads;
 import com.gtnewhorizons.angelica.glsm.streaming.TessellatorStreamingDrawer;
@@ -26,6 +27,7 @@ import static com.gtnewhorizons.angelica.glsm.GLStateManager.acquireDrawLock;
 import static com.gtnewhorizons.angelica.glsm.GLStateManager.ctx;
 import static com.gtnewhorizons.angelica.glsm.GLStateManager.guardUnsupportedFFP;
 import static com.gtnewhorizons.angelica.glsm.GLStateManager.initConfig;
+import static com.gtnewhorizons.angelica.glsm.GLStateManager.recordError;
 import static com.gtnewhorizons.angelica.glsm.GLStateManager.rejectExitCapture;
 import static com.gtnewhorizons.angelica.glsm.GLStateManager.releaseDrawLock;
 import static com.gtnewhorizons.angelica.glsm.GLStateManager.warnOnce;
@@ -50,27 +52,39 @@ public final class GLSMDraws {
     private static final String PIXELTRANSFER_MSG = "glPixelTransfer is not available in GL 3.3 core profile.";
 
     public static void glPixelTransferf(int pname, float param) {
-        guardUnsupportedFFP("glPixelTransfer", PIXELTRANSFER_MSG);
+        if (!RENDER_BACKEND.pixelTransfer(pname, param)) guardUnsupportedFFP("glPixelTransfer", PIXELTRANSFER_MSG);
     }
 
     public static void glPixelTransferi(int pname, int param) {
-        guardUnsupportedFFP("glPixelTransfer", PIXELTRANSFER_MSG);
+        if (!RENDER_BACKEND.pixelTransfer(pname, param)) guardUnsupportedFFP("glPixelTransfer", PIXELTRANSFER_MSG);
     }
 
     private static final String RASTERPOS_MSG = "glRasterPos is not available in GL 3.3 core profile.";
 
-    public static void glRasterPos2f(float x, float y) { guardUnsupportedFFP("glRasterPos", RASTERPOS_MSG); }
-    public static void glRasterPos2d(double x, double y) { guardUnsupportedFFP("glRasterPos", RASTERPOS_MSG); }
-    public static void glRasterPos2i(int x, int y) { guardUnsupportedFFP("glRasterPos", RASTERPOS_MSG); }
-    public static void glRasterPos3f(float x, float y, float z) { guardUnsupportedFFP("glRasterPos", RASTERPOS_MSG); }
-    public static void glRasterPos3d(double x, double y, double z) { guardUnsupportedFFP("glRasterPos", RASTERPOS_MSG); }
-    public static void glRasterPos3i(int x, int y, int z) { guardUnsupportedFFP("glRasterPos", RASTERPOS_MSG); }
-    public static void glRasterPos4f(float x, float y, float z, float w) { guardUnsupportedFFP("glRasterPos", RASTERPOS_MSG); }
-    public static void glRasterPos4d(double x, double y, double z, double w) { guardUnsupportedFFP("glRasterPos", RASTERPOS_MSG); }
-    public static void glRasterPos4i(int x, int y, int z, int w) { guardUnsupportedFFP("glRasterPos", RASTERPOS_MSG); }
+    private static void rasterPos(float x, float y, float z, float w) {
+        if (!RENDER_BACKEND.rasterPos(x, y, z, w)) guardUnsupportedFFP("glRasterPos", RASTERPOS_MSG);
+    }
+
+    public static void glRasterPos2f(float x, float y) { rasterPos(x, y, 0f, 1f); }
+    public static void glRasterPos2d(double x, double y) { rasterPos((float) x, (float) y, 0f, 1f); }
+    public static void glRasterPos2i(int x, int y) { rasterPos((float) x, (float) y, 0f, 1f); }
+    public static void glRasterPos3f(float x, float y, float z) { rasterPos(x, y, z, 1f); }
+    public static void glRasterPos3d(double x, double y, double z) { rasterPos((float) x, (float) y, (float) z, 1f); }
+    public static void glRasterPos3i(int x, int y, int z) { rasterPos((float) x, (float) y, (float) z, 1f); }
+    public static void glRasterPos4f(float x, float y, float z, float w) { rasterPos(x, y, z, w); }
+    public static void glRasterPos4d(double x, double y, double z, double w) { rasterPos((float) x, (float) y, (float) z, (float) w); }
+    public static void glRasterPos4i(int x, int y, int z, int w) { rasterPos((float) x, (float) y, (float) z, (float) w); }
 
     public static void glBegin(int mode) {
         rejectExitCapture();
+        if (mode < GL11.GL_POINTS || mode > GL11.GL_POLYGON) {
+            recordError(GL11.GL_INVALID_ENUM);
+            return;
+        }
+        if (ImmediateModeRecorder.isDrawing()) {
+            recordError(GL11.GL_INVALID_OPERATION);
+            return;
+        }
         ctx().unit23TexCoordSetDuringDraw = false;
         if (DisplayListManager.isRecording()) {
             ImmediateModeRecorder.begin(mode);
@@ -81,7 +95,15 @@ public final class GLSMDraws {
 
     public static void glEnd() {
         rejectExitCapture();
+        if (!ImmediateModeRecorder.isDrawing()) {
+            recordError(GL11.GL_INVALID_OPERATION);
+            return;
+        }
         final DirectTessellator result = ImmediateModeRecorder.end();
+        if (FeedbackManager.capturesImmediate() && !DisplayListManager.isRecording()) {
+            FeedbackManager.processImmediate();
+            return;
+        }
         if (result != null) {
             if (DisplayListManager.isRecording()) {
                 if (DisplayListManager.isCompileAndExecute() && initConfig != null && initConfig.getDirectDrawer() != null) {
@@ -141,6 +163,8 @@ public final class GLSMDraws {
     }
 
     public static void glDrawElements(int mode, ByteBuffer indices) {
+        GLSMVertexInput.clientArraysReachIndices(ctx(), indices.remaining(), GL11.GL_UNSIGNED_BYTE, com.gtnewhorizon.gtnhlib.bytebuf.MemoryUtilities.memAddress(indices), 0);
+        if (!RENDER_BACKEND.checks().drawPrimitive(mode)) return;
         rejectExitCapture();
         drawCalls++;
         CommandRecorder savedRecorder = null;
@@ -174,6 +198,8 @@ public final class GLSMDraws {
     }
 
     public static void glDrawElements(int mode, IntBuffer indices) {
+        GLSMVertexInput.clientArraysReachIndices(ctx(), indices.remaining(), GL11.GL_UNSIGNED_INT, com.gtnewhorizon.gtnhlib.bytebuf.MemoryUtilities.memAddress(indices), 0);
+        if (!RENDER_BACKEND.checks().drawPrimitive(mode)) return;
         rejectExitCapture();
         drawCalls++;
         CommandRecorder savedRecorder = null;
@@ -207,6 +233,8 @@ public final class GLSMDraws {
     }
 
     public static void glDrawElements(int mode, ShortBuffer indices) {
+        GLSMVertexInput.clientArraysReachIndices(ctx(), indices.remaining(), GL11.GL_UNSIGNED_SHORT, com.gtnewhorizon.gtnhlib.bytebuf.MemoryUtilities.memAddress(indices), 0);
+        if (!RENDER_BACKEND.checks().drawPrimitive(mode)) return;
         rejectExitCapture();
         drawCalls++;
         CommandRecorder savedRecorder = null;
@@ -240,6 +268,7 @@ public final class GLSMDraws {
     }
 
     public static void glDrawElements(int mode, int count, int type, ByteBuffer indices) {
+        GLSMVertexInput.clientArraysReachIndices(ctx(), count, type, com.gtnewhorizon.gtnhlib.bytebuf.MemoryUtilities.memAddress(indices), 0);
         rejectExitCapture();
         drawCalls++;
         CommandRecorder savedRecorder = null;
@@ -273,6 +302,12 @@ public final class GLSMDraws {
     }
 
     public static void glDrawElements(int mode, int indices_count, int type, long indices_buffer_offset) {
+        // With no element buffer bound, a pointer is client memory, as a compatibility profile reads it.
+        if (indices_buffer_offset != 0L && ctx().vaos.boundEBO == 0 && GLTypes.sizeBytes(type) > 0) {
+            glDrawElements(mode, indices_count, type, com.gtnewhorizon.gtnhlib.bytebuf.MemoryUtilities.memByteBuffer(indices_buffer_offset, indices_count * GLTypes.sizeBytes(type)));
+            return;
+        }
+        GLSMVertexInput.clientArraysReachBufferIndices(ctx(), indices_count, type, indices_buffer_offset, 0);
         rejectExitCapture();
         final GLContextState glCtx = ctx();
         drawCalls++;
@@ -317,24 +352,28 @@ public final class GLSMDraws {
     }
 
     public static void glMultiDrawElementsIndirect(int mode, int type, long indirect, int drawcount, int stride) {
+        GLSMVertexInput.clientArraysReach(-1);
         rejectExitCapture();
         drawCalls += drawcount;
         RENDER_BACKEND.multiDrawElementsIndirect(mode, type, indirect, drawcount, stride);
     }
 
     public static void glMultiDrawElementsBaseVertex(int mode, long pCount, int type, long pIndices, int drawcount, long pBaseVertex) {
+        GLSMVertexInput.clientArraysReach(-1);
         rejectExitCapture();
         drawCalls += drawcount;
         RENDER_BACKEND.multiDrawElementsBaseVertex(mode, pCount, type, pIndices, drawcount, pBaseVertex);
     }
 
     public static void glDrawElementsBaseVertex(int mode, int count, int type, long indices, int basevertex) {
+        GLSMVertexInput.clientArraysReachBufferIndices(ctx(), count, type, indices, basevertex);
         rejectExitCapture();
         drawCalls++;
         RENDER_BACKEND.drawElementsBaseVertex(mode, count, type, indices, basevertex);
     }
 
     public static void glDrawElementsInstanced(int mode, int count, int type, long indices, int primcount) {
+        GLSMVertexInput.clientArraysReachBufferIndices(ctx(), count, type, indices, 0);
         rejectExitCapture();
         drawCalls++;
         final GLContextState glCtx = ctx();
@@ -353,6 +392,7 @@ public final class GLSMDraws {
     }
 
     public static void glDrawArraysInstanced(int mode, int first, int count, int primcount) {
+        GLSMVertexInput.clientArraysReach(first + count);
         rejectExitCapture();
         drawCalls++;
         final GLContextState glCtx = ctx();
@@ -361,8 +401,7 @@ public final class GLSMDraws {
             if (mode == GL11.GL_QUADS) {
                 QuadConverter.drawQuadsAsTrianglesInstanced(glCtx, first, count, primcount);
             } else if (mode == GL11.GL_QUAD_STRIP) {
-                preDraw(glCtx, GL11.GL_TRIANGLES);
-                RENDER_BACKEND.drawArraysInstanced(GL11.GL_TRIANGLE_STRIP, first, count & ~1, primcount);
+                QuadConverter.drawQuadStripAsTriangles(glCtx, first, count, primcount, true);
             } else if (mode == GL11.GL_POLYGON) {
                 preDraw(glCtx, GL11.GL_TRIANGLES);
                 RENDER_BACKEND.drawArraysInstanced(GL11.GL_TRIANGLE_FAN, first, count, primcount);
@@ -377,7 +416,9 @@ public final class GLSMDraws {
     }
 
     public static void glDrawRangeElements(int mode, int start, int end, int count, int type, long indices) {
+        GLSMVertexInput.clientArraysReach(end + 1);
         rejectExitCapture();
+        if (!RENDER_BACKEND.checks().drawRange(start, end)) return;
         final GLContextState glCtx = ctx();
         final boolean locked = acquireDrawLock();
         try {
@@ -393,11 +434,17 @@ public final class GLSMDraws {
     }
 
     public static void glDrawRangeElementsBaseVertex(int mode, int start, int end, int count, int type, long indices, int baseVertex) {
+        GLSMVertexInput.clientArraysReach(end + 1 + baseVertex);
         rejectExitCapture();
+        if (!RENDER_BACKEND.checks().drawRange(start, end)) return;
         RENDER_BACKEND.drawRangeElementsBaseVertex(mode, start, end, count, type, indices, baseVertex);
     }
 
     public static void glMultiDrawArrays(int mode, IntBuffer firsts, IntBuffer counts) {
+        int reach = 0;
+        for (int i = firsts.position(), j = counts.position(); i < firsts.limit() && j < counts.limit(); i++, j++) reach = Math.max(reach, firsts.get(i) + counts.get(j));
+        GLSMVertexInput.clientArraysReach(reach);
+        if (!RENDER_BACKEND.checks().drawPrimitive(mode)) return;
         rejectExitCapture();
         final GLContextState glCtx = ctx();
         final boolean locked = acquireDrawLock();
@@ -423,6 +470,7 @@ public final class GLSMDraws {
     }
 
     public static void glDrawArrays(int mode, int first, int count) {
+        GLSMVertexInput.clientArraysReach(first + count);
         rejectExitCapture();
         drawCalls++;
         CommandRecorder savedRecorder = null;
@@ -453,8 +501,7 @@ public final class GLSMDraws {
                 if (mode == GL11.GL_QUADS) {
                     QuadConverter.drawQuadsAsTriangles(glCtx, first, count);
                 } else if (mode == GL11.GL_QUAD_STRIP) {
-                    preDraw(glCtx, GL11.GL_TRIANGLES);
-                    RENDER_BACKEND.drawArrays(GL11.GL_TRIANGLE_STRIP, first, count & ~1);
+                    QuadConverter.drawQuadStripAsTriangles(glCtx, first, count, 1, false);
                 } else if (mode == GL11.GL_POLYGON) {
                     preDraw(glCtx, GL11.GL_TRIANGLES);
                     RENDER_BACKEND.drawArrays(GL11.GL_TRIANGLE_FAN, first, count);
@@ -485,6 +532,10 @@ public final class GLSMDraws {
 
     public static int glGenLists(int range) {
         rejectExitCapture();
+        if (range <= 0) {
+            if (range < 0) recordError(GL11.GL_INVALID_VALUE);
+            return 0;
+        }
         return displayListIdAllocator.allocRange(range);
     }
 
@@ -521,6 +572,11 @@ public final class GLSMDraws {
 
     public static void glCallList(int list) {
         rejectExitCapture();
+        // Zero is no list's name, which drivers refuse rather than ignore.
+        if (list == 0) {
+            recordError(GL11.GL_INVALID_VALUE);
+            return;
+        }
         if (!GLDebug.isActive()) {
             DisplayListManager.glCallList(list);
             return;
@@ -605,11 +661,13 @@ public final class GLSMDraws {
     }
 
     public static void glMultiDrawArraysIndirectCount(int mode, long indirect, long drawcount, int maxdrawcount, int stride) {
+        GLSMVertexInput.clientArraysReach(-1);
         rejectExitCapture();
         RENDER_BACKEND.multiDrawArraysIndirectCount(mode, indirect, drawcount, maxdrawcount, stride);
     }
 
     public static void glMultiDrawElementsIndirectCount(int mode, int type, long indirect, long drawcount, int maxdrawcount, int stride) {
+        GLSMVertexInput.clientArraysReach(-1);
         rejectExitCapture();
         RENDER_BACKEND.multiDrawElementsIndirectCount(mode, type, indirect, drawcount, maxdrawcount, stride);
     }
@@ -617,21 +675,24 @@ public final class GLSMDraws {
     public static void glCallLists(IntBuffer lists) {
         while (lists.hasRemaining()) {
             final int listId = lists.get() + ctx().listBase;
-            glCallList(listId);
+            // glCallLists passes over zero, which glCallList refuses.
+            if (listId != 0) glCallList(listId);
         }
     }
 
     public static void glCallLists(ShortBuffer lists) {
         while (lists.hasRemaining()) {
             final int listId = (lists.get() & 0xFFFF) + ctx().listBase;
-            glCallList(listId);
+            // glCallLists passes over zero, which glCallList refuses.
+            if (listId != 0) glCallList(listId);
         }
     }
 
     public static void glCallLists(ByteBuffer lists) {
         while (lists.hasRemaining()) {
             final int listId = (lists.get() & 0xFF) + ctx().listBase;
-            glCallList(listId);
+            // glCallLists passes over zero, which glCallList refuses.
+            if (listId != 0) glCallList(listId);
         }
     }
 
@@ -665,7 +726,7 @@ public final class GLSMDraws {
     }
 
     public static void glAccum(int op, float value) {
-        guardUnsupportedFFP("glAccum", "The accumulation buffer is not available in GL 3.3 core profile.");
+        if (!RENDER_BACKEND.accum(op, value)) guardUnsupportedFFP("glAccum", "The accumulation buffer is not available in GL 3.3 core profile.");
     }
 
     public static void glFeedbackBuffer(int type, FloatBuffer buffer) {
@@ -687,19 +748,34 @@ public final class GLSMDraws {
 
     public static void glSelectBuffer(IntBuffer buffer) {
         rejectExitCapture();
+        if (RENDER_BACKEND.isNative()) {
+            FeedbackManager.glSelectBuffer(buffer);
+            return;
+        }
         if (!selectWarned) {
             LOGGER.warn("glSelectBuffer: selection mode not emulated");
             selectWarned = true;
         }
     }
 
-    public static void glInitNames() { /* no-op: ignored outside GL_SELECT */ }
+    public static void glInitNames() { nameStackCall(FeedbackManager::glInitNames); }
 
-    public static void glPushName(int name) { /* no-op */ }
+    public static void glPushName(int name) { nameStackCall(() -> FeedbackManager.glPushName(name)); }
 
-    public static void glPopName() { /* no-op */ }
+    public static void glPopName() { nameStackCall(FeedbackManager::glPopName); }
 
-    public static void glLoadName(int name) { /* no-op */ }
+    public static void glLoadName(int name) { nameStackCall(() -> FeedbackManager.glLoadName(name)); }
+
+    /** Name changes belong to a list being recorded, on the backends where they do anything. */
+    private static void nameStackCall(DisplayListCommand call) {
+        if (!RENDER_BACKEND.isNative()) return;
+        final RecordMode mode = DisplayListManager.getRecordMode();
+        if (mode != RecordMode.NONE) {
+            DisplayListManager.recordComplexCommand(call);
+            if (mode == RecordMode.COMPILE) return;
+        }
+        call.execute();
+    }
 
     /**
      * Draw modes that rely on the previous vertex data cannot be merged currently.

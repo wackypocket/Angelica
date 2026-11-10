@@ -1,0 +1,7 @@
+# Limits under what OpenGL 4.6 requires, and why. Reporting more would only move the failure to a shader that cannot link or an image that is not what it claims.
+GL_MAX_GEOMETRY_OUTPUT_COMPONENTS	We report 64 where the device has geometry shaders. Not yet checked against a device that has them
+GL_MAX_TESS_CONTROL_OUTPUT_COMPONENTS	We report 64 where the device has these stages. Not yet checked against such a device
+GL_MAX_TESS_CONTROL_TOTAL_OUTPUT_COMPONENTS	We report 64 where the device has these stages. Not yet checked against such a device
+GL_MAX_TESS_CONTROL_INPUT_COMPONENTS	We report 64 where the device has these stages. Not yet checked against such a device
+GL_MAX_TESS_EVALUATION_OUTPUT_COMPONENTS	We report 64 where the device has these stages. Not yet checked against such a device
+GL_MAX_TESS_EVALUATION_INPUT_COMPONENTS	We report 64 where the device has these stages. Not yet checked against such a device

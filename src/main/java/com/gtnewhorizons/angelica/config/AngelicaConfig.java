@@ -245,6 +245,11 @@ public class AngelicaConfig {
     @Config.RequiresMcRestart
     public static boolean enableDynamicLights;
 
+    @Config.Comment("Microseconds of each client tick the client may spend re-checking the lighting of loaded chunks. Vanilla has no limit, and around lava a single tick's checks can hold a frame for 20 ms or more; checks left over carry on next tick. 0 = no limit, as vanilla.")
+    @Config.DefaultInt(1000)
+    @Config.RangeInt(min = 0, max = 50000)
+    public static int clientRelightBudgetMicros;
+
     @Config.Comment("Optimize world update light. [From Hodgepodge]")
     @Config.DefaultBoolean(true)
     @Config.RequiresMcRestart
@@ -486,12 +491,12 @@ public class AngelicaConfig {
     @Config.RequiresMcRestart
     public static int glVersion;
 
-    @Config.Comment("Render backend: OPENGL, or SDL_GPU (experimental; Vulkan/Metal/Direct3D 12 through SDL3, falls back to OpenGL when no device can be created). -Dangelica.sdlgpu.enable=true|false overrides this.")
+    @Config.Comment("Render backend: OPENGL or VULKAN (testing; through the included MoltenVK on macOS). -Dangelica.experimentalBackends=true allows SDL_GPU (Vulkan/Metal/Direct3D 12 through SDL3) and METAL, and -Dangelica.sdlgpu.enable=true allows SDL_GPU. All of them fall back to OpenGL when no device can be created. -Dangelica.sdlgpu.enable, -Dangelica.vulkan and -Dangelica.metal override this.")
     @Config.DefaultEnum("OPENGL")
     @Config.RequiresMcRestart
     public static RenderBackendChoice renderBackend;
 
-    @Config.Comment("SDL GPU driver: AUTO, VULKAN, METAL (macOS), D3D12 (Windows). Vulkan on macOS needs MoltenVK and uses Metal without it. -Dangelica.sdlgpu.driver overrides this.")
+    @Config.Comment("SDL GPU driver: AUTO, VULKAN, METAL (macOS), D3D12 (Windows). Vulkan on macOS uses the included MoltenVK. If the chosen driver cannot start, the platform's other drivers are tried, then OpenGL. -Dangelica.sdlgpu.driver overrides this.")
     @Config.DefaultEnum("AUTO")
     @Config.RequiresMcRestart
     public static SdlGpuDriver sdlGpuDriver;
@@ -579,6 +584,14 @@ public class AngelicaConfig {
 
     public static boolean sdlGpuConfigured() {
         return renderBackend == RenderBackendChoice.SDL_GPU;
+    }
+
+    public static boolean nativeConfigured() {
+        return renderBackend != null && renderBackend.isNative();
+    }
+
+    public static String nativeDriverName() {
+        return renderBackend == null ? "" : renderBackend.nativeDriver();
     }
 
     public static String sdlGpuDriverName() {

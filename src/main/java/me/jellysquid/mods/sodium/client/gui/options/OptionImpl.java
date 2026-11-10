@@ -1,5 +1,6 @@
 package me.jellysquid.mods.sodium.client.gui.options;
 
+import java.util.Objects;
 import lombok.Getter;
 import lombok.Setter;
 import me.flashyreese.mods.reeses_sodium_options.client.gui.OptionExtended;
@@ -35,6 +36,7 @@ public class OptionImpl<S, T> implements OptionExtended<T> {
     private T modifiedValue;
 
     private BooleanSupplier iris$dynamicallyEnabled;
+    private BooleanSupplier angelica$dynamicallyVisible;
     private final boolean enabled;
 
     private OptionImpl(OptionStorage<S> storage,
@@ -94,6 +96,16 @@ public class OptionImpl<S, T> implements OptionExtended<T> {
     }
 
     @Override
+    public void syncIfUnchanged() {
+        if (this.hasChanged()) return;
+        final T current = this.binding.getValue(this.storage.getData());
+        if (!Objects.equals(current, this.value)) {
+            this.value = current;
+            this.modifiedValue = current;
+        }
+    }
+
+    @Override
     public OptionStorage<?> getStorage() {
         return this.storage;
     }
@@ -118,6 +130,15 @@ public class OptionImpl<S, T> implements OptionExtended<T> {
     }
     public void iris$dynamicallyEnable(BooleanSupplier enabled) {
         this.iris$dynamicallyEnabled = enabled;
+    }
+
+    @Override
+    public boolean isVisible() {
+        return angelica$dynamicallyVisible == null || angelica$dynamicallyVisible.getAsBoolean();
+    }
+
+    public void angelica$dynamicallyShow(BooleanSupplier visible) {
+        this.angelica$dynamicallyVisible = visible;
     }
 
     @Override

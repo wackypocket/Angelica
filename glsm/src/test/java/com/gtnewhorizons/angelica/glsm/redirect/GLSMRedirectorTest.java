@@ -66,6 +66,14 @@ class GLSMRedirectorTest {
         return cn;
     }
 
+    @Test
+    void aRedirectWithNoMatchingOverloadLeavesTheCallAlone() {
+        final String desc = "(ILjava/nio/IntBuffer;)V";
+        final ClassNode cn = makeClassWithMethodCall("org/lwjgl/opengl/GL11", "glFog", desc);
+        new GLSMRedirector().transformClassNode("com.example.TestClass", cn);
+        assertEquals("org/lwjgl/opengl/GL11", firstCall(cn).owner, "GLSM has no glFog(int, IntBuffer) to call");
+    }
+
     private static MethodInsnNode firstCall(ClassNode cn) {
         for (AbstractInsnNode node : cn.methods.get(0).instructions.toArray()) {
             if (node instanceof MethodInsnNode) return (MethodInsnNode) node;

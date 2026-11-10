@@ -15,6 +15,7 @@ import lombok.Getter;
 import org.lwjgl.opengl.ARBShaderObjects;
 import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL20;
+import org.lwjgl.opengl.GL41;
 import org.lwjgl.opengl.KHRDebug;
 import java.nio.ByteBuffer;
 import java.nio.FloatBuffer;
@@ -43,6 +44,7 @@ public final class GLSMPrograms {
     }
 
     public static void glUseProgram(int program) {
+        if (!RENDER_BACKEND.checks().useProgram(program)) return;
         rejectExitCapture();
         final GLContextState glCtx = ctx();
         final RecordMode mode = DisplayListManager.getRecordMode();
@@ -72,6 +74,7 @@ public final class GLSMPrograms {
                 GLSMHooks.programChangeEvent.postBind = true;
                 GLSMHooks.PROGRAM_CHANGE.post(GLSMHooks.programChangeEvent);
             }
+            if (changed) RENDER_BACKEND.programReleased();
             return;
         }
 
@@ -163,11 +166,11 @@ public final class GLSMPrograms {
         RENDER_BACKEND.specializeShader(shader, entryPoint, constantIndex, constantValue);
     }
 
-    public static int glGetUniformBlockIndex(int program, CharSequence name) { rejectExitCapture(); return RENDER_BACKEND.getUniformBlockIndex(program, name); }
+    public static int glGetUniformBlockIndex(int program, CharSequence name) { if (!RENDER_BACKEND.checks().glGetUniformBlockIndex(program)) return -1; rejectExitCapture(); return RENDER_BACKEND.getUniformBlockIndex(program, name); }
     public static void glUniformBlockBinding(int program, int blockIndex, int binding) { rejectExitCapture(); RENDER_BACKEND.uniformBlockBinding(program, blockIndex, binding); }
-    public static void glBindFragDataLocation(int program, int colorNumber, CharSequence name) { rejectExitCapture(); RENDER_BACKEND.bindFragDataLocation(program, colorNumber, name); }
-    public static void glUniform3(int location, float[] values) { rejectExitCapture(); RENDER_BACKEND.uniform3fv(location, values); }
-    public static void glUniform4(int location, float[] values) { rejectExitCapture(); RENDER_BACKEND.uniform4fv(location, values); }
+    public static void glBindFragDataLocation(int program, int colorNumber, CharSequence name) { if (!RENDER_BACKEND.checks().glBindFragDataLocation(program, colorNumber)) return; rejectExitCapture(); RENDER_BACKEND.bindFragDataLocation(program, colorNumber, name); }
+    public static void glUniform3(int location, float[] values) { if (!RENDER_BACKEND.checks().glUniform3fv(location, values.length / 3)) return; rejectExitCapture(); RENDER_BACKEND.uniform3fv(location, values); }
+    public static void glUniform4(int location, float[] values) { if (!RENDER_BACKEND.checks().glUniform4fv(location, values.length / 4)) return; rejectExitCapture(); RENDER_BACKEND.uniform4fv(location, values); }
 
     public static void glLinkProgram(int program) {
         rejectExitCapture();
@@ -214,19 +217,21 @@ public final class GLSMPrograms {
         RENDER_BACKEND.getAttachedShaders(program, null, glCtx.shaderBuf);
 
         int fragmentShader = 0;
-        boolean hasVertex = false;
+        boolean otherStages = false;
         for (int i = 0; i < shaderCount; i++) {
             final int shader = glCtx.shaderBuf.get(i);
             final int type = RENDER_BACKEND.getShaderi(shader, GL20.GL_SHADER_TYPE);
-            if (type == GL20.GL_VERTEX_SHADER) {
-                hasVertex = true;
+            // Only a fragment-only program gets a generated vertex stage; one with a geometry or tessellation stage but no vertex shader fails to link, as in GL.
+            if (type != GL20.GL_FRAGMENT_SHADER) {
+                otherStages = true;
                 break;
-            } else if (type == GL20.GL_FRAGMENT_SHADER) {
+            } else {
                 fragmentShader = shader;
             }
         }
 
-        if (hasVertex || fragmentShader == 0) return;
+        // A pipeline gives a separable program its vertex stage.
+        if (otherStages || fragmentShader == 0 || RENDER_BACKEND.programIsSeparableAtNextLink(program)) return;
 
         // Fragment-only program - generate a passthrough vertex shader
         final String fragSource = RENDER_BACKEND.getShaderSource(fragmentShader, 65536);
@@ -310,6 +315,7 @@ public final class GLSMPrograms {
     }
 
     public static void glBindAttribLocation(int program, int index, CharSequence name) {
+        if (!RENDER_BACKEND.checks().glBindAttribLocation(program, index)) return;
         rejectExitCapture();
         RENDER_BACKEND.bindAttribLocation(program, index, name);
     }
@@ -320,31 +326,37 @@ public final class GLSMPrograms {
     }
 
     public static int glGetShaderi(int shader, int pname) {
+        if (!RENDER_BACKEND.checks().glGetShaderiv(shader, pname)) return 0;
         rejectExitCapture();
         return RENDER_BACKEND.getShaderi(shader, pname);
     }
 
     public static String glGetShaderInfoLog(int shader, int maxLength) {
+        if (!RENDER_BACKEND.checks().glGetShaderInfoLog(shader, maxLength)) return "";
         rejectExitCapture();
         return RENDER_BACKEND.getShaderInfoLog(shader, maxLength);
     }
 
     public static String glGetShaderInfoLog(int shader) {
+        if (!RENDER_BACKEND.checks().glGetShaderInfoLog(shader, 0)) return "";
         rejectExitCapture();
         return RENDER_BACKEND.getShaderInfoLog(shader);
     }
 
     public static int glGetProgrami(int program, int pname) {
+        if (!RENDER_BACKEND.checks().glGetProgramiv(program, pname)) return 0;
         rejectExitCapture();
         return RENDER_BACKEND.getProgrami(program, pname);
     }
 
     public static String glGetProgramInfoLog(int program, int maxLength) {
+        if (!RENDER_BACKEND.checks().glGetProgramInfoLog(program, maxLength)) return "";
         rejectExitCapture();
         return RENDER_BACKEND.getProgramInfoLog(program, maxLength);
     }
 
     public static String glGetProgramInfoLog(int program) {
+        if (!RENDER_BACKEND.checks().glGetProgramInfoLog(program, 0)) return "";
         rejectExitCapture();
         return RENDER_BACKEND.getProgramInfoLog(program);
     }
@@ -353,7 +365,8 @@ public final class GLSMPrograms {
         rejectExitCapture();
         final boolean valid = RENDER_BACKEND.isProgram(obj);
         if (!valid) programsPendingDeletion.remove(obj);
-        return valid;
+        // The fixed function path keeps the backend's own program bound after glUseProgram(0), so a deleted program may outlive its use there.
+        return valid && (obj == ctx().activeProgram || !programsPendingDeletion.contains(obj));
     }
 
     public static boolean glIsShader(int obj) {
@@ -381,6 +394,7 @@ public final class GLSMPrograms {
     }
 
     public static int glGetAttribLocation(int program, CharSequence name) {
+        if (!RENDER_BACKEND.checks().glGetAttribLocation(program)) return -1;
         rejectExitCapture();
         int loc = RENDER_BACKEND.getAttribLocation(program, name);
         if (loc == -1 && TEXTURE.contentEquals(name)) {
@@ -390,6 +404,7 @@ public final class GLSMPrograms {
     }
 
     public static int glGetAttribLocation(int program, ByteBuffer name) {
+        if (!RENDER_BACKEND.checks().glGetAttribLocation(program)) return -1;
         rejectExitCapture();
         int loc = RENDER_BACKEND.getAttribLocation(program, name);
         if (loc == -1 && isTextureBuffer(name)) {
@@ -462,96 +477,126 @@ public final class GLSMPrograms {
 
     public static void glUniform1f(int location, float v0) {
         rejectExitCapture();
+        if (!RENDER_BACKEND.checks().uniformProgramBound(ctx().activeProgram)) return;
         RENDER_BACKEND.uniform1f(location, v0);
     }
 
     public static void glUniform2f(int location, float v0, float v1) {
         rejectExitCapture();
+        if (!RENDER_BACKEND.checks().uniformProgramBound(ctx().activeProgram)) return;
         RENDER_BACKEND.uniform2f(location, v0, v1);
     }
 
     public static void glUniform3f(int location, float v0, float v1, float v2) {
         rejectExitCapture();
+        if (!RENDER_BACKEND.checks().uniformProgramBound(ctx().activeProgram)) return;
         RENDER_BACKEND.uniform3f(location, v0, v1, v2);
     }
 
     public static void glUniform4f(int location, float v0, float v1, float v2, float v3) {
         rejectExitCapture();
+        if (!RENDER_BACKEND.checks().uniformProgramBound(ctx().activeProgram)) return;
         RENDER_BACKEND.uniform4f(location, v0, v1, v2, v3);
     }
 
     public static void glUniform1i(int location, int v0) {
         rejectExitCapture();
+        if (!RENDER_BACKEND.checks().uniformProgramBound(ctx().activeProgram)) return;
         RENDER_BACKEND.uniform1i(location, v0);
     }
 
     public static void glUniform2i(int location, int v0, int v1) {
         rejectExitCapture();
+        if (!RENDER_BACKEND.checks().uniformProgramBound(ctx().activeProgram)) return;
         RENDER_BACKEND.uniform2i(location, v0, v1);
     }
 
     public static void glUniform3i(int location, int v0, int v1, int v2) {
         rejectExitCapture();
+        if (!RENDER_BACKEND.checks().uniformProgramBound(ctx().activeProgram)) return;
         RENDER_BACKEND.uniform3i(location, v0, v1, v2);
     }
 
     public static void glUniform4i(int location, int v0, int v1, int v2, int v3) {
         rejectExitCapture();
+        if (!RENDER_BACKEND.checks().uniformProgramBound(ctx().activeProgram)) return;
         RENDER_BACKEND.uniform4i(location, v0, v1, v2, v3);
     }
 
     public static void glUniform1(int location, FloatBuffer values) {
+        if (!RENDER_BACKEND.checks().glUniform1fv(location, values.remaining() / 1)) return;
         rejectExitCapture();
+        if (!RENDER_BACKEND.checks().uniformProgramBound(ctx().activeProgram)) return;
         RENDER_BACKEND.uniform1fv(location, values);
     }
 
     public static void glUniform1(int location, IntBuffer values) {
+        if (!RENDER_BACKEND.checks().glUniform1iv(location, values.remaining() / 1)) return;
         rejectExitCapture();
+        if (!RENDER_BACKEND.checks().uniformProgramBound(ctx().activeProgram)) return;
         RENDER_BACKEND.uniform1iv(location, values);
     }
 
     public static void glUniform2(int location, FloatBuffer values) {
+        if (!RENDER_BACKEND.checks().glUniform2fv(location, values.remaining() / 2)) return;
         rejectExitCapture();
+        if (!RENDER_BACKEND.checks().uniformProgramBound(ctx().activeProgram)) return;
         RENDER_BACKEND.uniform2(location, values);
     }
 
     public static void glUniform2(int location, IntBuffer values) {
+        if (!RENDER_BACKEND.checks().glUniform2iv(location, values.remaining() / 2)) return;
         rejectExitCapture();
+        if (!RENDER_BACKEND.checks().uniformProgramBound(ctx().activeProgram)) return;
         RENDER_BACKEND.uniform2iv(location, values);
     }
 
     public static void glUniform3(int location, FloatBuffer values) {
+        if (!RENDER_BACKEND.checks().glUniform3fv(location, values.remaining() / 3)) return;
         rejectExitCapture();
+        if (!RENDER_BACKEND.checks().uniformProgramBound(ctx().activeProgram)) return;
         RENDER_BACKEND.uniform3(location, values);
     }
 
     public static void glUniform3(int location, IntBuffer values) {
+        if (!RENDER_BACKEND.checks().glUniform3iv(location, values.remaining() / 3)) return;
         rejectExitCapture();
+        if (!RENDER_BACKEND.checks().uniformProgramBound(ctx().activeProgram)) return;
         RENDER_BACKEND.uniform3iv(location, values);
     }
 
     public static void glUniform4(int location, FloatBuffer values) {
+        if (!RENDER_BACKEND.checks().glUniform4fv(location, values.remaining() / 4)) return;
         rejectExitCapture();
+        if (!RENDER_BACKEND.checks().uniformProgramBound(ctx().activeProgram)) return;
         RENDER_BACKEND.uniform4(location, values);
     }
 
     public static void glUniform4(int location, IntBuffer values) {
+        if (!RENDER_BACKEND.checks().glUniform4iv(location, values.remaining() / 4)) return;
         rejectExitCapture();
+        if (!RENDER_BACKEND.checks().uniformProgramBound(ctx().activeProgram)) return;
         RENDER_BACKEND.uniform4iv(location, values);
     }
 
     public static void glUniformMatrix2(int location, boolean transpose, FloatBuffer matrices) {
+        if (!RENDER_BACKEND.checks().glUniformMatrix2fv(location, matrices.remaining() / 4)) return;
         rejectExitCapture();
+        if (!RENDER_BACKEND.checks().uniformProgramBound(ctx().activeProgram)) return;
         RENDER_BACKEND.uniformMatrix2(location, transpose, matrices);
     }
 
     public static void glUniformMatrix3(int location, boolean transpose, FloatBuffer matrices) {
+        if (!RENDER_BACKEND.checks().glUniformMatrix3fv(location, matrices.remaining() / 9)) return;
         rejectExitCapture();
+        if (!RENDER_BACKEND.checks().uniformProgramBound(ctx().activeProgram)) return;
         RENDER_BACKEND.uniformMatrix3(location, transpose, matrices);
     }
 
     public static void glUniformMatrix4(int location, boolean transpose, FloatBuffer matrices) {
+        if (!RENDER_BACKEND.checks().glUniformMatrix4fv(location, matrices.remaining() / 16)) return;
         rejectExitCapture();
+        if (!RENDER_BACKEND.checks().uniformProgramBound(ctx().activeProgram)) return;
         RENDER_BACKEND.uniformMatrix4(location, transpose, matrices);
     }
 
@@ -571,16 +616,19 @@ public final class GLSMPrograms {
     }
 
     public static void glGetAttachedShaders(int program, IntBuffer count, IntBuffer shaders) {
+        if (!RENDER_BACKEND.checks().glGetAttachedShaders(program, 0)) return;
         rejectExitCapture();
         RENDER_BACKEND.getAttachedShaders(program, count, shaders);
     }
 
     public static String glGetShaderSource(int shader, int maxLength) {
+        if (!RENDER_BACKEND.checks().glGetShaderSource(shader, maxLength)) return "";
         rejectExitCapture();
         return RENDER_BACKEND.getShaderSource(shader, maxLength);
     }
 
     public static void glGetShaderSource(int shader, IntBuffer length, ByteBuffer source) {
+        if (!RENDER_BACKEND.checks().glGetShaderSource(shader, 0)) return;
         rejectExitCapture();
         RENDER_BACKEND.getShaderSource(shader, length, source);
     }

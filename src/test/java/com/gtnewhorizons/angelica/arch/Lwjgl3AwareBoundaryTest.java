@@ -25,7 +25,10 @@ class Lwjgl3AwareBoundaryTest {
     /** Modules built against native LWJGL3; every class in them must be aware. */
     private static final List<String> AWARE_MODULES = List.of(
         "com.gtnewhorizons.angelica.sdlgpu.",
-        "com.gtnewhorizons.angelica.lwjgl3.");
+        "com.gtnewhorizons.angelica.lwjgl3.",
+        "com.gtnewhorizons.angelica.glemu.",
+        "com.gtnewhorizons.angelica.vulkan.",
+        "com.gtnewhorizons.angelica.metal.");
 
     private static final List<ScannedClass> classes = ArchScan.in(Dir.values());
 

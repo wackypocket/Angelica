@@ -487,6 +487,21 @@ public class DisplayListManager {
         currentRecorder.writeColorMaterial(face, mode);
     }
 
+    public static void recordBlendEquationSeparate(int modeRGB, int modeAlpha) {
+        drawBarrier();
+        currentRecorder.writeBlendEquationSeparate(modeRGB, modeAlpha);
+    }
+
+    public static void recordReadBuffer(int mode) {
+        drawBarrier();
+        currentRecorder.writeReadBuffer(mode);
+    }
+
+    public static void recordSampleCoverage(float value, boolean invert) {
+        drawBarrier();
+        currentRecorder.writeSampleCoverage(value, invert);
+    }
+
     public static void recordLogicOp(int opcode) {
         drawBarrier();
         currentRecorder.writeLogicOp(opcode);
@@ -884,6 +899,14 @@ public class DisplayListManager {
      *   GL_COMPILE_AND_EXECUTE: Commands are recorded AND executed (GLSM cache updated)
      */
     public static synchronized void glNewList(int list, int mode) {
+        if (list == 0) {
+            GLStateManager.recordError(GL11.GL_INVALID_VALUE);
+            return;
+        }
+        if (mode != GL11.GL_COMPILE && mode != GL11.GL_COMPILE_AND_EXECUTE) {
+            GLStateManager.recordError(GL11.GL_INVALID_ENUM);
+            return;
+        }
         final Thread recorder = recordingThread;
         if (recorder != null && recorder != Thread.currentThread()) {
             throw new IllegalStateException("glNewList(" + list + ") on " + Thread.currentThread().getName() + " while " + recorder.getName() + " is compiling a display list");
@@ -963,6 +986,7 @@ public class DisplayListManager {
         }
         if (glListMode == 0) {
             GLStateManager.warnOnce("endlist-outside", "glEndList called outside of a display list!");
+            GLStateManager.recordError(GL11.GL_INVALID_OPERATION);
             return;
         }
         if (Tracy.ENABLED) Tracy.beginZone(Z_GL_LIST_COMPILE);
